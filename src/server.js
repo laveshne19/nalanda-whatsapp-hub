@@ -101,6 +101,18 @@ if (require.main === module) {
   const server = createServer({ config, state, openwa });
   server.listen(config.port, '0.0.0.0', () => log(`[hub] listening on ${config.port}`));
 
+  // Check the Shopify credentials now, so a typo shows up in the logs at start, not on a customer's order.
+  if (config.shopify && config.shopify.auth) {
+    config.shopify.auth
+      .getToken()
+      .then(() => {
+        const scope = config.shopify.auth.scope();
+        log(`[hub] Shopify connected${scope ? `, access: ${scope}` : ''}`);
+        if (scope && /write_/.test(scope)) log('[hub] WARNING: the Shopify app can WRITE. This hub only needs read_orders, remove the extra access.');
+      })
+      .catch((e) => log(`[hub] Shopify login failed: ${e.message}. Order tracking will hand over to a person.`));
+  }
+
   // Tell OpenWA where to send messages. Failure is logged, never fatal (it can be set in the dashboard instead).
   if (config.hubWebhookUrl) {
     const events = config.staffReplyPauses ? ['message.received', 'message.sent'] : ['message.received'];

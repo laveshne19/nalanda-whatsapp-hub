@@ -1,4 +1,5 @@
 'use strict';
+const { createTokenProvider } = require('./shopify');
 
 function fromEnv(env = process.env) {
   const need = (k) => {
@@ -12,6 +13,9 @@ function fromEnv(env = process.env) {
 
   const shopDomain = (env.SHOPIFY_SHOP_DOMAIN || '').trim();
   const shopToken = (env.SHOPIFY_ADMIN_TOKEN || '').trim();
+  const shopClientId = (env.SHOPIFY_CLIENT_ID || '').trim();
+  const shopClientSecret = (env.SHOPIFY_CLIENT_SECRET || '').trim();
+  const shopApiVersion = (env.SHOPIFY_API_VERSION || '2026-10').trim();
 
   return {
     port: Number(env.PORT || 8080),
@@ -22,8 +26,17 @@ function fromEnv(env = process.env) {
       sessionId: need('OPENWA_SESSION_ID'),
     },
     shopify:
-      shopDomain && shopToken
-        ? { domain: shopDomain, token: shopToken, apiVersion: (env.SHOPIFY_API_VERSION || '2026-10').trim() }
+      shopDomain && (shopToken || (shopClientId && shopClientSecret))
+        ? {
+            domain: shopDomain,
+            apiVersion: shopApiVersion,
+            auth: createTokenProvider({
+              domain: shopDomain,
+              clientId: shopClientId,
+              clientSecret: shopClientSecret,
+              staticToken: shopToken,
+            }),
+          }
         : null,
     // Alerts for bulk enquiries, cancellations and leads go here. Also the only chat allowed to
     // ask the bot for the report ("report", "leads", "done REF").

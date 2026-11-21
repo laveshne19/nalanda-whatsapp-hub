@@ -137,3 +137,14 @@ test('website lead body over 32 KB is refused', async () => {
     assert.equal(res.status, 413);
   } finally { server.close(); }
 });
+
+test('config builds Shopify access from a client id and secret, or from a fixed token, or not at all', () => {
+  const base = { OPENWA_URL: 'https://x', OPENWA_API_KEY: 'k', OPENWA_SESSION_ID: 's', WEBHOOK_SECRET: 'x'.repeat(20) };
+  const viaClient = fromEnv({ ...base, SHOPIFY_SHOP_DOMAIN: 'a.myshopify.com', SHOPIFY_CLIENT_ID: 'id', SHOPIFY_CLIENT_SECRET: 'sec' });
+  assert.equal(viaClient.shopify.domain, 'a.myshopify.com');
+  assert.equal(typeof viaClient.shopify.auth.getToken, 'function');
+  const viaToken = fromEnv({ ...base, SHOPIFY_SHOP_DOMAIN: 'a.myshopify.com', SHOPIFY_ADMIN_TOKEN: 'shpat_x' });
+  assert.ok(viaToken.shopify.auth);
+  assert.equal(fromEnv({ ...base, SHOPIFY_SHOP_DOMAIN: 'a.myshopify.com', SHOPIFY_CLIENT_ID: 'id' }).shopify, null); // secret missing
+  assert.equal(fromEnv({ ...base }).shopify, null);
+});

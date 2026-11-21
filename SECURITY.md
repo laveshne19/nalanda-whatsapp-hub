@@ -17,7 +17,7 @@ What this service does and does not do with customer data.
 - Zero npm dependencies, so there is nothing to poison in the supply chain.
 
 ## Keep it that way
-- Shopify token: custom app, `read_orders` scope only. Rotate it if anyone leaves.
+- Shopify app: `read_orders` only. The hub warns in its log if the app can write. Rotate the client secret in the Dev Dashboard if anyone leaves.
 - OpenWA key for the hub: an OPERATOR key, separate from your admin key.
 - Do not expose port 8080 to the internet. OpenWA reaches the hub over the private Docker network.
 

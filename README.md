@@ -33,7 +33,7 @@ Website form -> server function -> (signed POST /lead/website) -> hub
 
 ## Setup
 See `deploy/docker-compose.yml` and `.env.example`. In short:
-1. Shopify custom app with the `read_orders` permission only. Token goes in `SHOPIFY_ADMIN_TOKEN`.
+1. Shopify app (Dev Dashboard) with the `read_orders` permission only, installed on the store. Its client id and secret go in `SHOPIFY_CLIENT_ID` and `SHOPIFY_CLIENT_SECRET`. The hub logs the access it was given at start and warns if the app can write.
 2. In OpenWA, link the number, then create an OPERATOR key for the hub (`HUB_OPENWA_KEY`).
 3. Set `HUB_WEBHOOK_SECRET` and `HUB_LEADS_SECRET` to long random values.
 4. Start the stack. The hub registers its webhook in OpenWA by itself.
