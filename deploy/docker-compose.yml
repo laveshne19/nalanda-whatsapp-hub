@@ -61,7 +61,7 @@ services:
       start_period: 60s
 
   nalanda-hub:
-    image: ghcr.io/laveshne19/nalanda-whatsapp-hub:0.3.1
+    image: ghcr.io/laveshne19/nalanda-whatsapp-hub:0.4.0
     container_name: nalanda-hub
     restart: unless-stopped
     depends_on:

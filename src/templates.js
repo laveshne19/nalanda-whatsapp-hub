@@ -30,8 +30,23 @@ const T = {
   lookupFailed: () =>
     'I could not check that just now. I have passed it to our team and they will reply here soon.',
 
-  orderConfirmed: (name, day) =>
-    `Yes, your order #${String(name).replace(/^#/, '')} is confirmed. We dispatch from Monday to Saturday, 11 AM to 7 PM, so it will be shipped ${day === 'today' ? 'today' : day === 'tomorrow' ? 'tomorrow' : 'on ' + day}. We will send you the tracking details once it is on its way.`,
+  orderConfirmed: (name) =>
+    `Yes, your order #${String(name).replace(/^#/, '')} is confirmed. Our team will call you once to confirm the details, as we do for every order. Thank you for shopping with us.`,
+
+  shipped: (name, fulfillments) => {
+    const lines = [`Good news, your order #${String(name).replace(/^#/, '')} has been shipped.`];
+    for (const f of fulfillments || []) {
+      for (const t of f.trackingInfo || []) {
+        const bits = [];
+        if (t.company) bits.push(`Courier: ${t.company}`);
+        if (t.number) bits.push(`Tracking ID: ${t.number}`);
+        if (bits.length) lines.push(bits.join(', ') + '.');
+        if (t.url) lines.push(`Track here: ${t.url}`);
+      }
+    }
+    lines.push('It will reach you in a few days. Reply here if you need any help.');
+    return lines.join('\n');
+  },
 
   order: () =>
     `Happy to help. You can browse and order at ${SITE}, or tell us the product and quantity here ` +

@@ -43,6 +43,7 @@ function fromEnv(env = process.env) {
     staffChat: (env.STAFF_CHAT_ID || '').trim() || null,
     wholesaleContact: (env.WHOLESALE_CONTACT || '').trim() || null,
     reportHourIst: Number(env.REPORT_HOUR_IST || 20),
+    shipmentsHourIst: Number(env.SHIPMENTS_HOUR_IST || 18),
     businessHours: (env.BUSINESS_HOURS || '').trim() || null,
     hubWebhookUrl: (env.HUB_WEBHOOK_URL || '').trim() || null,
     leads: {

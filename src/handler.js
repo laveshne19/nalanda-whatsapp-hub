@@ -2,7 +2,6 @@
 const { classify, extractOrderNumber } = require('./intents');
 const { T, orderStatus, staffNote, leadNew, leadAlert } = require('./templates');
 const { lookupOrder, findRecentOrderByPhone, phoneKey } = require('./shopify');
-const { dispatchDay } = require('./business');
 const leads = require('./leads');
 const { buildReport, leadsText } = require('./report');
 const { notifyStaff, sendDirect } = require('./notify');
@@ -288,7 +287,7 @@ async function handleOrderStatus({ deps, chatId, phone, body, orderNumber, now }
   const o = result.order;
   state.bump('tracking_answered', now);
   if (o.cancelledAt || SHIPPED.has(o.fulfillmentStatus)) return reply(deps, chatId, orderStatus(o), 'order_status', now);
-  return reply(deps, chatId, T.orderConfirmed(o.name, dispatchDay(now).label), 'order_status', now);
+  return reply(deps, chatId, T.orderConfirmed(o.name), 'order_status', now);
 }
 
 async function handleCancel({ deps, chatId, phone, body, orderNumber, now }) {

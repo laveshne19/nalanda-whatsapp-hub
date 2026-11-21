@@ -200,4 +200,57 @@ async function findRecentOrderByPhone({ shopify, senderPhone, days = 30, fetchIm
   };
 }
 
-module.exports = { lookupOrder, findRecentOrderByPhone, phoneKey, createTokenProvider };
+const SHIPPED_QUERY = `query Shipped($q: String!) {
+  orders(first: 100, sortKey: UPDATED_AT, reverse: true, query: $q) {
+    edges { node {
+      name cancelledAt phone
+      customer { defaultPhoneNumber { phoneNumber } }
+      shippingAddress { phone }
+      billingAddress { phone }
+      fulfillments(first: 5) { createdAt trackingInfo { company number url } }
+    } }
+  }
+}`;
+
+/**
+ * Orders that got a tracking number in the last `hours` hours (read only).
+ * @returns {Promise<Array<{name:string, phone:string, fulfillments:Array}>>}
+ */
+async function listRecentShipments({ shopify, hours = 30, fetchImpl = fetch, now = Date.now }) {
+  if (!shopify) throw new Error('Shopify is not configured');
+  const cutoff = now() - hours * 3600 * 1000;
+  const since = new Date(cutoff - 24 * 3600 * 1000).toISOString().slice(0, 10);
+  const call = async () => {
+    const token = shopify.auth ? await shopify.auth.getToken() : shopify.token;
+    return fetchImpl(`https://${shopify.domain}/admin/api/${shopify.apiVersion}/graphql.json`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-shopify-access-token': token },
+      body: JSON.stringify({ query: SHIPPED_QUERY, variables: { q: `updated_at:>=${since} fulfillment_status:shipped` } }),
+      signal: AbortSignal.timeout(20000),
+    });
+  };
+  let res = await call();
+  if (res.status === 401 && shopify.auth) {
+    shopify.auth.invalidate();
+    res = await call();
+  }
+  if (!res.ok) throw new Error(`Shopify HTTP ${res.status}`);
+  const body = await res.json();
+  if (body.errors && body.errors.length) throw new Error('Shopify GraphQL error');
+
+  const out = [];
+  for (const e of (body.data && body.data.orders && body.data.orders.edges) || []) {
+    const n = e.node;
+    if (n.cancelledAt) continue;
+    const fresh = (n.fulfillments || []).filter(
+      (f) => Date.parse(f.createdAt) >= cutoff && (f.trackingInfo || []).some((t) => t.number),
+    );
+    if (!fresh.length) continue;
+    const phone = [n.phone, n.customer && n.customer.defaultPhoneNumber && n.customer.defaultPhoneNumber.phoneNumber,
+      n.shippingAddress && n.shippingAddress.phone, n.billingAddress && n.billingAddress.phone].find((p) => phoneKey(p));
+    out.push({ name: n.name, phone: phone || '', fulfillments: fresh });
+  }
+  return out;
+}
+
+module.exports = { lookupOrder, findRecentOrderByPhone, listRecentShipments, phoneKey, createTokenProvider };

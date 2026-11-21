@@ -203,7 +203,7 @@ test('"is my order confirmed" with a real order under the sender phone gets a co
   const { deps, sent } = setup({ fetchImpl: ordersResponse(unfulfilled('+91 98765 43210')) });
   await handleEvent(msg('I placed an order, is it confirmed?'), deps);
   assert.match(sent[0].text, /order #2001 is confirmed/);
-  assert.match(sent[0].text, /shipped (today|tomorrow|on \w+day)/);
+  assert.match(sent[0].text, /call you once to confirm/);
   assert.ok(!/[—–]/.test(sent[0].text));
 });
 

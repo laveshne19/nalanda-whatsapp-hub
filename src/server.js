@@ -5,6 +5,7 @@ const { State } = require('./state');
 const { createClient, verifySignature } = require('./openwa');
 const { handleEvent, intakeLead } = require('./handler');
 const { maybeSendDailyReport, sweepLeads } = require('./report');
+const { maybeSendShipments } = require('./shipments');
 const { retry } = require('./util');
 
 const MAX_BODY = 256 * 1024;
@@ -131,6 +132,7 @@ if (require.main === module) {
   const tick = () => {
     maybeSendDailyReport(deps).catch((e) => log(`[report] ${e.message}`));
     sweepLeads(deps).catch((e) => log(`[sweep] ${e.message}`));
+    maybeSendShipments(deps).catch((e) => log(`[shipments] ${e.message}`));
   };
   setInterval(tick, 60 * 1000).unref();
 

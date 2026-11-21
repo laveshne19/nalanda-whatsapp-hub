@@ -18,7 +18,7 @@ class State {
     this.file = file || null;
     this.data = {
       seen: [], optOut: {}, handoff: {}, pending: {}, replies: {}, botMsgs: [],
-      stats: {}, leads: {}, lastReportDate: null, intake: [], leadSends: [],
+      stats: {}, leads: {}, lastReportDate: null, shipNotified: [], lastShipDate: null, intake: [], leadSends: [],
     };
     if (this.file) this._load();
   }
@@ -150,6 +150,22 @@ class State {
     const day = this.data.stats[dateStr] || { chats: [] };
     return { ...day, chats: day.chats.length };
   }
+  shipNotified(name) {
+    return this.data.shipNotified.includes(String(name));
+  }
+  markShipNotified(name) {
+    this.data.shipNotified.push(String(name));
+    if (this.data.shipNotified.length > 5000) this.data.shipNotified.splice(0, 1000);
+    this._save();
+  }
+  lastShipDate() {
+    return this.data.lastShipDate;
+  }
+  setLastShipDate(d) {
+    this.data.lastShipDate = d;
+    this._save();
+  }
+
   lastReportDate() {
     return this.data.lastReportDate;
   }
