@@ -35,7 +35,18 @@ function createTokenProvider({ domain, clientId, clientSecret, staticToken, fetc
       body: new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, client_secret: clientSecret }).toString(),
       signal: AbortSignal.timeout(15000),
     });
-    if (!res.ok) throw new Error(`Shopify token request failed: HTTP ${res.status}`);
+    if (!res.ok) {
+      // Shopify explains a refusal in its reply (for example "invalid_client"). Log that reason, never our secret.
+      let detail = '';
+      try {
+        const b = await res.json();
+        const parts = [typeof b.error === 'string' ? b.error : '', typeof b.error_description === 'string' ? b.error_description : ''];
+        detail = parts.filter(Boolean).join(': ').replace(/\s+/g, ' ').slice(0, 200);
+      } catch {
+        /* no readable body */
+      }
+      throw new Error(`Shopify token request failed: HTTP ${res.status}${detail ? ` (${detail})` : ''}`);
+    }
     const body = await res.json();
     if (!body || !body.access_token) throw new Error('Shopify token response had no access_token');
     token = body.access_token;
