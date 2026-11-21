@@ -1,7 +1,8 @@
 'use strict';
 const { classify, extractOrderNumber } = require('./intents');
 const { T, orderStatus, staffNote, leadNew, leadAlert } = require('./templates');
-const { lookupOrder, phoneKey } = require('./shopify');
+const { lookupOrder, findRecentOrderByPhone, phoneKey } = require('./shopify');
+const { dispatchDay } = require('./business');
 const leads = require('./leads');
 const { buildReport, leadsText } = require('./report');
 const { notifyStaff, sendDirect } = require('./notify');
@@ -147,6 +148,8 @@ async function handleEvent(payload, deps) {
       });
     case 'cancel':
       return handleCancel({ deps, chatId, phone, body, orderNumber, now });
+    case 'order_status':
+      return handleOrderStatus({ deps, chatId, phone, body, orderNumber, now });
     case 'tracking':
       return handleTracking({ deps, chatId, phone, body, orderNumber, now });
     default:
@@ -265,6 +268,27 @@ async function handleTracking({ deps, chatId, phone, body, orderNumber, now }) {
   }
   state.bump('tracking_answered', now);
   return reply(deps, chatId, orderStatus(result.order), 'tracking', now);
+}
+
+// "Is my order confirmed?" Answer only when the order is really in Shopify under the sender's own phone.
+async function handleOrderStatus({ deps, chatId, phone, body, orderNumber, now }) {
+  const { config, state } = deps;
+  if (orderNumber) return handleTracking({ deps, chatId, phone, body, orderNumber, now });
+  const handOff = (kind) =>
+    reply(deps, chatId, T.lookupFailed(), 'order_status', now, { handoff: { kind, phone, body }, startHandoff: true });
+  if (!config.shopify) return handOff('Order confirmation question (lookup off)');
+  let result;
+  try {
+    result = await findRecentOrderByPhone({ shopify: config.shopify, senderPhone: phone, fetchImpl: deps.fetchImpl, now: () => now });
+  } catch (e) {
+    (deps.log || console.error)('[order_status] lookup failed', e.message);
+    return handOff('Order confirmation question (lookup failed)');
+  }
+  if (!result.found) return reply(deps, chatId, T.askOrderNumber(), 'order_status', now);
+  const o = result.order;
+  state.bump('tracking_answered', now);
+  if (o.cancelledAt || SHIPPED.has(o.fulfillmentStatus)) return reply(deps, chatId, orderStatus(o), 'order_status', now);
+  return reply(deps, chatId, T.orderConfirmed(o.name, dispatchDay(now).label), 'order_status', now);
 }
 
 async function handleCancel({ deps, chatId, phone, body, orderNumber, now }) {

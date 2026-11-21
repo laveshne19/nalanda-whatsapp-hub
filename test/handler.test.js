@@ -192,3 +192,24 @@ test('state survives a restart (file store)', async () => {
   assert.equal(b.seen('abc'), true);
   assert.equal((fs.statSync(file).mode & 0o777).toString(8), '600');
 });
+
+const unfulfilled = (phone) => ({
+  name: '#2001', createdAt: 'x', cancelledAt: null, displayFulfillmentStatus: 'UNFULFILLED', phone: null,
+  customer: { defaultPhoneNumber: { phoneNumber: phone } }, shippingAddress: null, billingAddress: null, fulfillments: [],
+});
+const ordersResponse = (node) => async () => ({ ok: true, json: async () => ({ data: { orders: { edges: node ? [{ node }] : [] } } }) });
+
+test('"is my order confirmed" with a real order under the sender phone gets a confirmation with the dispatch day', async () => {
+  const { deps, sent } = setup({ fetchImpl: ordersResponse(unfulfilled('+91 98765 43210')) });
+  await handleEvent(msg('I placed an order, is it confirmed?'), deps);
+  assert.match(sent[0].text, /order #2001 is confirmed/);
+  assert.match(sent[0].text, /shipped (today|tomorrow|on \w+day)/);
+  assert.ok(!/[—–]/.test(sent[0].text));
+});
+
+test('"is my order confirmed" never claims confirmation when no order exists for that phone', async () => {
+  const { deps, sent } = setup({ fetchImpl: ordersResponse(unfulfilled('+91 90000 00000')) });
+  await handleEvent(msg('is my order confirmed?'), deps);
+  assert.ok(!/confirmed/.test(sent[0].text));
+  assert.match(sent[0].text, /order number/);
+});

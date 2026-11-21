@@ -40,6 +40,9 @@ const cases = [
   ['I want to return my parcel, which I ordered from your website', 'support'],
   ['my earbuds are not working', 'support'],
   ['warranty claim for my watch', 'support'],
+  ['I placed an order, is it confirmed?', 'order_status'],
+  ['has my order been confirmed', 'order_status'],
+  ['order confirmation please', 'order_status'],
   ['', 'unknown'],
 ];
 

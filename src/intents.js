@@ -32,6 +32,8 @@ const RE = {
   order: /\b(order|buy|purchase|price|rate|catalogue|catalog|available|availability|stock|kharidna|chahiye)\b/i,
   // Only a message that is nothing but a greeting. "Good evening Sir, any requirement of ..." is not one.
   greeting: /^\s*(hi+|hello+|hey+|hlo+|namaste|namaskar|good\s+(morning|afternoon|evening)|menu|help)(\s+(sir|mam|madam|ji|team))?\s*[.!?]*\s*$/i,
+  orderStatus:
+    /\b(is|has|was|were|are)\b[^.?!]{0,40}\border\b[^.?!]{0,40}\b(confirm(ed)?|placed|received|accepted|go(ne)?\s+through)\b|\bconfirm(ed|ation)?\b[^.?!]{0,40}\border\b|\border\b[^.?!]{0,40}\bconfirm(ed|ation)?\b|\b(placed|made)\s+an?\s+order\b/i,
   support:
     /\b(not working|doesn'?t work|stopped working|not charging|defective|damaged|broken|warranty|repair|replace(ment)?|how to (install|use|connect|pair|set\s?up|fix)|installation|return)\b/i,
 };
@@ -52,6 +54,7 @@ function classify(text) {
   if (RE.cancel.test(t)) return { intent: 'cancel', orderNumber };
   if (RE.trackingStrong.test(t)) return { intent: 'tracking', orderNumber };
   if (RE.support.test(t)) return { intent: 'support', orderNumber };
+  if (RE.orderStatus.test(t)) return { intent: 'order_status', orderNumber };
   if (RE.bulk.test(t)) return { intent: 'bulk', orderNumber: null };
   if (RE.trackingWeak.test(t)) return { intent: 'tracking', orderNumber };
   if (RE.order.test(t)) {

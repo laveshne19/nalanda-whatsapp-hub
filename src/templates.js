@@ -30,6 +30,9 @@ const T = {
   lookupFailed: () =>
     'I could not check that just now. I have passed it to our team and they will reply here soon.',
 
+  orderConfirmed: (name, day) =>
+    `Yes, your order #${String(name).replace(/^#/, '')} is confirmed. We dispatch from Monday to Saturday, 11 AM to 7 PM, so it will be shipped ${day === 'today' ? 'today' : day === 'tomorrow' ? 'tomorrow' : 'on ' + day}. We will send you the tracking details once it is on its way.`,
+
   order: () =>
     `Happy to help. You can browse and order at ${SITE}, or tell us the product and quantity here ` +
     'and our team will confirm the price and availability. Reply 4 to talk to our team.',

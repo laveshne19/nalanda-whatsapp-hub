@@ -5,6 +5,7 @@ const { T, orderStatus, staffNote } = require('../src/templates');
 
 const sample = [
   T.menu(), T.askOrderNumber(), T.notFound('1234'), T.unverified(), T.lookupFailed(), T.order(),
+  T.orderConfirmed('#1234', 'Monday'), T.orderConfirmed('#1234', 'today'),
   T.bulkAsk(), T.bulkThanks(), T.human('10am to 7pm'), T.unknown(), T.optOut(), T.optIn(),
   orderStatus({ name: '#1234', fulfillmentStatus: 'FULFILLED', fulfillments: [] }),
 ];

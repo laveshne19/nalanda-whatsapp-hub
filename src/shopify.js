@@ -144,4 +144,60 @@ async function lookupOrder({ shopify, orderNumber, senderPhone, fetchImpl = fetc
   };
 }
 
-module.exports = { lookupOrder, phoneKey, createTokenProvider };
+const RECENT_QUERY = `query RecentOrders($q: String!) {
+  orders(first: 50, sortKey: CREATED_AT, reverse: true, query: $q) {
+    edges { node {
+      name createdAt cancelledAt displayFulfillmentStatus displayFinancialStatus phone
+      customer { defaultPhoneNumber { phoneNumber } }
+      shippingAddress { phone }
+      billingAddress { phone }
+      fulfillments(first: 5) { status deliveredAt trackingInfo { company number url } }
+    } }
+  }
+}`;
+
+/**
+ * Newest order placed from the sender's own phone number in the last `days` days (read only).
+ * Used when a customer asks "is my order confirmed?" without giving a number.
+ * @returns {Promise<{found:false}|{found:true, order:object}>}
+ */
+async function findRecentOrderByPhone({ shopify, senderPhone, days = 30, fetchImpl = fetch, now = Date.now }) {
+  if (!shopify) throw new Error('Shopify is not configured');
+  const sender = phoneKey(senderPhone);
+  if (!sender) return { found: false };
+  const since = new Date(now() - days * 24 * 3600 * 1000).toISOString().slice(0, 10);
+
+  const call = async () => {
+    const token = shopify.auth ? await shopify.auth.getToken() : shopify.token;
+    return fetchImpl(`https://${shopify.domain}/admin/api/${shopify.apiVersion}/graphql.json`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-shopify-access-token': token },
+      body: JSON.stringify({ query: RECENT_QUERY, variables: { q: `created_at:>=${since}` } }),
+      signal: AbortSignal.timeout(15000),
+    });
+  };
+  let res = await call();
+  if (res.status === 401 && shopify.auth) {
+    shopify.auth.invalidate();
+    res = await call();
+  }
+  if (!res.ok) throw new Error(`Shopify HTTP ${res.status}`);
+  const body = await res.json();
+  if (body.errors && body.errors.length) throw new Error('Shopify GraphQL error');
+
+  const edges = (body.data && body.data.orders && body.data.orders.edges) || [];
+  const hit = edges.map((e) => e.node).find((n) => orderPhones(n).includes(sender));
+  if (!hit) return { found: false };
+  return {
+    found: true,
+    order: {
+      name: hit.name,
+      cancelledAt: hit.cancelledAt,
+      fulfillmentStatus: hit.displayFulfillmentStatus,
+      financialStatus: hit.displayFinancialStatus,
+      fulfillments: hit.fulfillments || [],
+    },
+  };
+}
+
+module.exports = { lookupOrder, findRecentOrderByPhone, phoneKey, createTokenProvider };
