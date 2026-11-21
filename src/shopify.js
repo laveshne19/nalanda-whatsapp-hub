@@ -64,6 +64,7 @@ async function lookupOrder({ shopify, orderNumber, senderPhone, fetchImpl = fetc
       name: node.name,
       cancelledAt: node.cancelledAt,
       fulfillmentStatus: node.displayFulfillmentStatus,
+      financialStatus: node.displayFinancialStatus,
       fulfillments: node.fulfillments || [],
     },
   };

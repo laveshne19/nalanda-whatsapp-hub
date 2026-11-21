@@ -70,3 +70,70 @@ test('config refuses to start without a strong webhook secret', () => {
   assert.equal(ok.shopify, null);
   assert.equal(ok.staffReplyPauses, false);
 });
+
+// ---- website lead endpoint ----
+const LEAD_SECRET = 'lead-secret-for-tests-123';
+async function bootLeads(secret = LEAD_SECRET) {
+  const sent = [];
+  const config = {
+    webhookSecret: SECRET, shopify: null, staffChat: '919569913332@c.us', wholesaleContact: null, businessHours: null,
+    reportHourIst: 20, staffReplyPauses: false, limits: { repliesPerChatPerHour: 10, handoffHours: 12 },
+    leads: { secret, proactive: true, notifyOnCreate: true, proactivePerDay: 30, intakePerHour: 60, staleMinutes: 30 },
+  };
+  const openwa = { sendText: async (c, t) => { sent.push({ c, t }); return { messageId: 'x' }; } };
+  const server = createServer({ config, state: new State(null), openwa, log: () => {} });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return { server, sent, url: `http://127.0.0.1:${server.address().port}` };
+}
+const lead = JSON.stringify({ name: 'Asha', phone: '9876543210', product: 'Mugs', source: 'corporate-gifting-india' });
+
+test('signed website lead is accepted, a reference is returned, and the chat starts', async () => {
+  const { server, sent, url } = await bootLeads();
+  try {
+    const res = await fetch(`${url}/lead/website`, { method: 'POST', body: lead, headers: { 'x-lead-signature': sign(lead, LEAD_SECRET) } });
+    assert.equal(res.status, 200);
+    const out = await res.json();
+    assert.match(out.ref, /^[A-HJ-NP-Z2-9]{6}$/);
+    assert.ok(sent.some((s) => s.c === '919876543210@c.us'));
+  } finally { server.close(); }
+});
+
+test('website lead with a bad or missing signature is refused and nothing is sent', async () => {
+  const { server, sent, url } = await bootLeads();
+  try {
+    const a = await fetch(`${url}/lead/website`, { method: 'POST', body: lead });
+    const b = await fetch(`${url}/lead/website`, { method: 'POST', body: lead, headers: { 'x-lead-signature': sign(lead, SECRET) } }); // the OTHER secret
+    assert.equal(a.status, 401);
+    assert.equal(b.status, 401);
+    assert.equal(sent.length, 0);
+  } finally { server.close(); }
+});
+
+test('website lead endpoint does not exist unless LEADS_SECRET is set', async () => {
+  const { server, url } = await bootLeads(null);
+  try {
+    const res = await fetch(`${url}/lead/website`, { method: 'POST', body: lead, headers: { 'x-lead-signature': sign(lead, LEAD_SECRET) } });
+    assert.equal(res.status, 404);
+  } finally { server.close(); }
+});
+
+test('website lead with an invalid phone is a 400, bad json is a 400', async () => {
+  const { server, url } = await bootLeads();
+  try {
+    const bad = JSON.stringify({ name: 'A', phone: '12' });
+    const r1 = await fetch(`${url}/lead/website`, { method: 'POST', body: bad, headers: { 'x-lead-signature': sign(bad, LEAD_SECRET) } });
+    assert.equal(r1.status, 400);
+    const notJson = 'not json';
+    const r2 = await fetch(`${url}/lead/website`, { method: 'POST', body: notJson, headers: { 'x-lead-signature': sign(notJson, LEAD_SECRET) } });
+    assert.equal(r2.status, 400);
+  } finally { server.close(); }
+});
+
+test('website lead body over 32 KB is refused', async () => {
+  const { server, url } = await bootLeads();
+  try {
+    const big = JSON.stringify({ phone: '9876543210', message: 'x'.repeat(40 * 1024) });
+    const res = await fetch(`${url}/lead/website`, { method: 'POST', body: big, headers: { 'x-lead-signature': sign(big, LEAD_SECRET) } }).catch(() => ({ status: 413 }));
+    assert.equal(res.status, 413);
+  } finally { server.close(); }
+});

@@ -24,3 +24,13 @@ What this service does and does not do with customer data.
 ## Known limits
 - Unofficial WhatsApp connection through OpenWA. WhatsApp can restrict the number.
 - The state file is plain JSON, fine for one number, not for a cluster.
+
+## Website enquiry endpoint
+- `POST /lead/website` is the only hub path reachable from the internet, through the HTTPS front door.
+- It requires `X-Lead-Signature` (HMAC-SHA256 of the body, key `LEADS_SECRET`). Without the secret set it returns 404.
+- The signing secret must live on a server (for example a Netlify function), never in browser code.
+- Limits: 32 KB body, 60 submissions an hour, 30 bot-started chats a day, one lead per phone per 24 hours.
+- Never message a number twice for the same enquiry. Every message carries "Reply STOP to opt out".
+
+## Owner commands
+Only the chat set as `STAFF_CHAT_ID` can use `report`, `leads` and `done REF`. Anyone else typing those words is treated as a normal customer.

@@ -3,9 +3,11 @@ const http = require('node:http');
 const { fromEnv } = require('./config');
 const { State } = require('./state');
 const { createClient, verifySignature } = require('./openwa');
-const { handleEvent } = require('./handler');
+const { handleEvent, intakeLead } = require('./handler');
+const { maybeSendDailyReport, sweepLeads } = require('./report');
 
 const MAX_BODY = 256 * 1024;
+const MAX_LEAD_BODY = 32 * 1024;
 
 function readBody(req, limit) {
   return new Promise((resolve, reject) => {
@@ -36,6 +38,34 @@ function createServer({ config, state, openwa, fetchImpl, log = console.log }) {
     };
 
     if (req.method === 'GET' && req.url === '/healthz') return send(200, 'ok');
+
+    // Website enquiry form (server to server, e.g. a Netlify function). Off unless LEADS_SECRET is set.
+    if (req.method === 'POST' && req.url === '/lead/website') {
+      if (!config.leads || !config.leads.secret) return send(404, 'not found');
+      let raw;
+      try {
+        raw = await readBody(req, MAX_LEAD_BODY);
+      } catch (e) {
+        return send(e.status || 400, 'bad request');
+      }
+      if (!verifySignature(raw, req.headers['x-lead-signature'], config.leads.secret)) return send(401, 'unauthorized');
+      let input;
+      try {
+        input = JSON.parse(raw.toString('utf8'));
+      } catch {
+        return send(400, 'bad json');
+      }
+      if (!input || typeof input !== 'object' || Array.isArray(input)) return send(400, 'bad json');
+      try {
+        const out = await intakeLead(input, deps);
+        res.writeHead(out.ok ? 200 : out.status || 400, { 'content-type': 'application/json' });
+        return res.end(JSON.stringify(out.ok ? { ok: true, ref: out.ref } : { ok: false, error: out.error }));
+      } catch (e) {
+        log(`[lead] error: ${e.message}`);
+        return send(500, 'error');
+      }
+    }
+
     if (req.method !== 'POST' || req.url !== '/webhook/openwa') return send(404, 'not found');
 
     let raw;
@@ -67,8 +97,27 @@ if (require.main === module) {
   const config = fromEnv();
   const state = new State(config.statePath);
   const openwa = createClient(config.openwa);
+  const log = console.log;
   const server = createServer({ config, state, openwa });
-  server.listen(config.port, '0.0.0.0', () => console.log(`[hub] listening on ${config.port}`));
+  server.listen(config.port, '0.0.0.0', () => log(`[hub] listening on ${config.port}`));
+
+  // Tell OpenWA where to send messages. Failure is logged, never fatal (it can be set in the dashboard instead).
+  if (config.hubWebhookUrl) {
+    const events = config.staffReplyPauses ? ['message.received', 'message.sent'] : ['message.received'];
+    openwa
+      .ensureWebhook({ url: config.hubWebhookUrl, secret: config.webhookSecret, events })
+      .then((r) => log(`[hub] webhook ${r.created ? 'registered' : 'already present'} in OpenWA`))
+      .catch((e) => log(`[hub] could not register webhook automatically: ${e.message}`));
+  }
+
+  // Once a minute: send the daily report when due, and make sure unanswered leads reach a person.
+  const deps = { config, state, openwa, log };
+  const tick = () => {
+    maybeSendDailyReport(deps).catch((e) => log(`[report] ${e.message}`));
+    sweepLeads(deps).catch((e) => log(`[sweep] ${e.message}`));
+  };
+  setInterval(tick, 60 * 1000).unref();
+
   for (const sig of ['SIGTERM', 'SIGINT']) process.on(sig, () => server.close(() => process.exit(0)));
 }
 

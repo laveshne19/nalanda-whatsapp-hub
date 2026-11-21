@@ -47,3 +47,38 @@ test('sendText surfaces the status when OpenWA refuses (pacing limit)', async ()
   });
   await assert.rejects(() => client.sendText('1@c.us', 'x'), (e) => e.status === 429);
 });
+
+test('ensureWebhook creates the webhook when it is missing', async () => {
+  const calls = [];
+  const client = createClient({
+    baseUrl: 'https://wa.example', apiKey: 'k', sessionId: 's1',
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url, method: init.method || 'GET', body: init.body });
+      return init.method === 'POST' ? { ok: true, json: async () => ({}) } : { ok: true, json: async () => [{ url: 'http://other/hook' }] };
+    },
+  });
+  const r = await client.ensureWebhook({ url: 'http://nalanda-hub:8080/webhook/openwa', secret: 'x'.repeat(20), events: ['message.received'] });
+  assert.equal(r.created, true);
+  assert.equal(calls[1].method, 'POST');
+  assert.deepEqual(JSON.parse(calls[1].body).events, ['message.received']);
+  assert.equal(JSON.parse(calls[1].body).url, 'http://nalanda-hub:8080/webhook/openwa');
+});
+
+test('ensureWebhook leaves an existing webhook alone', async () => {
+  let posts = 0;
+  const client = createClient({
+    baseUrl: 'https://wa.example', apiKey: 'k', sessionId: 's1',
+    fetchImpl: async (url, init = {}) => {
+      if (init.method === 'POST') posts++;
+      return { ok: true, json: async () => [{ url: 'http://nalanda-hub:8080/webhook/openwa' }] };
+    },
+  });
+  const r = await client.ensureWebhook({ url: 'http://nalanda-hub:8080/webhook/openwa', secret: 'x'.repeat(20), events: ['message.received'] });
+  assert.equal(r.created, false);
+  assert.equal(posts, 0);
+});
+
+test('ensureWebhook reports failures instead of hiding them', async () => {
+  const client = createClient({ baseUrl: 'https://wa.example', apiKey: 'k', sessionId: 's1', fetchImpl: async () => ({ ok: false, status: 401 }) });
+  await assert.rejects(() => client.ensureWebhook({ url: 'u', secret: 'x'.repeat(20), events: ['message.received'] }), /401/);
+});

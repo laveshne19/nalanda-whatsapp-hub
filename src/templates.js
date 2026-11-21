@@ -3,7 +3,11 @@
 // Customer-facing wording. Plain, short, written like a person at the shop.
 // Rule for every string here: no em dashes, no robotic filler.
 
+const { summary } = require('./leads');
+
 const SITE = 'https://www.nalandaenterprises.com';
+const firstName = (lead) => (lead.name || '').split(' ')[0] || 'there';
+const summaryLine = summary;
 
 const T = {
   menu: () =>
@@ -30,10 +34,54 @@ const T = {
     `Happy to help. You can browse and order at ${SITE}, or tell us the product and quantity here ` +
     'and our team will confirm the price and availability. Reply 4 to talk to our team.',
 
-  bulkAsk: () =>
-    'Thanks for your bulk or corporate enquiry. Please share in one message:\n' +
+  bulkAsk: (contact) =>
+    'Thanks for your bulk or wholesale enquiry. Please share in one message:\n' +
     '1) the product(s)\n2) quantity\n3) your company name and city\n4) the date you need delivery by\n' +
-    'Our team will send you a quote, usually within one working day.',
+    'Our team will call you with a quote.' +
+    (contact ? ` You can also reach our wholesale desk directly on ${contact}.` : ''),
+
+  // ---- order cancellation ----
+  cancelAskNumber: () => 'I can help with that. Please send the order number you want to cancel, for example #1234.',
+  cancelConfirm: (n) =>
+    `Order #${n} has not shipped yet, so it can still be cancelled. Reply YES to cancel it, or NO to keep it.`,
+  cancelLogged: (n) =>
+    `Done, I have sent your cancellation request for order #${n} to our team. They will confirm here, and any refund goes back to the original payment method.`,
+  cancelKept: (n) => `Okay, order #${n} stays as it is.`,
+  alreadyCancelled: (n) => `Order #${n} is already cancelled.`,
+  cannotCancelShipped: (n) =>
+    `Order #${n} has already been shipped, so I cannot cancel it here. I have asked our team to help you with a return or refusal at delivery.`,
+
+  // ---- website enquiries ----
+  leadHello: (lead, question) =>
+    `Hi ${firstName(lead)}, this is Nalanda Enterprises. Thanks for your enquiry${lead.product ? ` about ${lead.product}` : ''}. ` +
+    `To get you the right quote quickly: ${question} (Reply STOP to opt out.)`,
+  leadAsk: (step, lead) => {
+    if (step === 'item') return 'which item are you looking for, and roughly how many units?';
+    if (step === 'qty') return `how many units of ${lead.product || 'it'} do you need?`;
+    return 'by what date do you need them? A rough date is fine, or say no fixed date.';
+  },
+  leadAskAgain: (step, lead) => {
+    if (step === 'item') return 'Sorry, which item are you looking for?';
+    if (step === 'qty') return 'Sorry, I need a number for the quote, like 50 or 200. How many units do you need?';
+    return `And ${T.leadAsk(step, lead)}`;
+  },
+  leadNext: (step, lead) => {
+    const q = T.leadAsk(step, lead);
+    return `Thanks. ${q[0].toUpperCase()}${q.slice(1)}`;
+  },
+  leadKnown: (lead) =>
+    `We already have your enquiry (ref ${lead.ref}). Our team will be in touch shortly. If something has changed, just tell us here.`,
+  leadDone: (lead, kind) => {
+    const first = firstName(lead);
+    if (kind === 'closed') return `No problem ${first}, thank you for letting us know. If you need anything later, message us here any time.`;
+    if (kind === 'single') {
+      return `Thanks ${first}. For one piece the easiest way is to order directly at ${SITE}. If you later need a larger quantity, message us here and we will quote you.`;
+    }
+    if (kind === 'low') {
+      return `Thanks ${first}. For small quantities you can order directly at ${SITE}. If you would still like a quote, our team will message you.`;
+    }
+    return `Thank you ${first}, we have your enquiry: ${summaryLine(lead)}. Our team will call you ${kind === 'hot' ? 'shortly' : 'within one working day'}.`;
+  },
 
   bulkThanks: () =>
     'Thank you, we have noted this. Our team will get back to you here shortly.',
@@ -96,4 +144,19 @@ function staffNote(kind, phone, body) {
   return `[${kind}] from ${phone}${text ? `: ${text}` : ''}`;
 }
 
-module.exports = { T, orderStatus, staffNote };
+function leadNew(lead) {
+  const who = `${lead.name || 'No name'}, +${lead.phone}${lead.company ? `, ${lead.company}` : ''}`;
+  return (
+    `[New lead ${lead.ref}] ${who}. ${lead.product || 'No item given'}${lead.qty ? `, ${lead.qty} units` : ''}. ` +
+    `Source: ${lead.source}.${lead.note ? ` Note: ${lead.note}` : ''}`
+  );
+}
+
+function leadAlert(lead, kind) {
+  const label = { hot: 'HOT lead', warm: 'Lead', low: 'Small lead', single: 'Single piece', closed: 'Not interested', stale: 'No reply yet' }[kind] || 'Lead';
+  const call = kind === 'hot' ? ' CALL NOW.' : kind === 'warm' || kind === 'stale' ? ' Please call.' : '';
+  const who = `${lead.name || 'No name'}, +${lead.phone}${lead.company ? `, ${lead.company}` : ''}`;
+  return `[${label} ${lead.ref}] ${who}: ${summary(lead)}.${call}`;
+}
+
+module.exports = { T, orderStatus, staffNote, leadNew, leadAlert };

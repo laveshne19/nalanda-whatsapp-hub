@@ -82,8 +82,8 @@ test('Shopify failure hands over to a person and pauses the bot', async () => {
 test('bulk enquiry asks for details, then the next message goes to staff', async () => {
   const { deps, sent, state } = setup();
   await handleEvent(msg('need bulk order of power banks'), deps);
-  assert.match(sent[0].text, /bulk or corporate enquiry/);
-  assert.match(sent[1].text, /^\[Bulk enquiry\]/);
+  assert.match(sent[0].text, /bulk or wholesale enquiry/);
+  assert.match(sent[1].text, /^\[Bulk or wholesale enquiry\]/);
   await handleEvent(msg('500 pcs, ABC Traders Ludhiana, by 5 Dec'), deps);
   assert.match(sent[2].text, /we have noted this/);
   assert.match(sent[3].text, /Bulk enquiry details.*500 pcs/);

@@ -1,25 +1,30 @@
 'use strict';
 const fs = require('node:fs');
 const path = require('node:path');
+const { istDate } = require('./util');
 
 const MAX_SEEN = 5000;
+const HOUR = 3600 * 1000;
+const STATS_DAYS = 35;
 
 /**
- * Small JSON-file store: handled message ids, broadcast opt-outs, human handoff
- * windows, pending follow-ups and per-chat reply counts. One process, one file.
- * Writes are atomic (temp file then rename).
+ * Small JSON-file store for one number: handled message ids, broadcast opt-outs, human
+ * handoff windows, pending follow-ups, per-chat reply counts, daily stats and website leads.
+ * Writes are atomic (temp file then rename), file mode 600.
  */
 class State {
   constructor(file) {
     this.file = file || null;
-    this.data = { seen: [], optOut: {}, handoff: {}, pending: {}, replies: {} };
+    this.data = {
+      seen: [], optOut: {}, handoff: {}, pending: {}, replies: {}, botMsgs: [],
+      stats: {}, leads: {}, lastReportDate: null, intake: [], leadSends: [],
+    };
     if (this.file) this._load();
   }
 
   _load() {
     try {
-      const raw = JSON.parse(fs.readFileSync(this.file, 'utf8'));
-      this.data = { ...this.data, ...raw };
+      this.data = { ...this.data, ...JSON.parse(fs.readFileSync(this.file, 'utf8')) };
     } catch (e) {
       if (e.code !== 'ENOENT') console.error('[state] could not read state file, starting empty:', e.code || e.message);
     }
@@ -46,15 +51,13 @@ class State {
     return false;
   }
 
-  /** Remember ids of messages the bot sent, so a person's own replies can be told apart. */
   rememberBotMessage(id) {
-    this.data.botMsgs = this.data.botMsgs || [];
     this.data.botMsgs.push(String(id));
     if (this.data.botMsgs.length > 2000) this.data.botMsgs.splice(0, this.data.botMsgs.length - 2000);
     this._save();
   }
   isBotMessage(id) {
-    return (this.data.botMsgs || []).includes(String(id));
+    return this.data.botMsgs.includes(String(id));
   }
 
   isOptedOut(chatId) {
@@ -81,16 +84,20 @@ class State {
     this._save();
   }
 
-  setPending(chatId, kind, ms, now = Date.now()) {
-    this.data.pending[chatId] = { kind, until: now + ms };
+  /** A short-lived "I asked, waiting for your answer" marker, with optional details. */
+  setPending(chatId, kind, ms, now = Date.now(), meta = null) {
+    this.data.pending[chatId] = { kind, until: now + ms, meta };
     this._save();
   }
-  takePending(chatId, now = Date.now()) {
+  peekPending(chatId, now = Date.now()) {
     const p = this.data.pending[chatId];
-    if (!p) return null;
-    delete this.data.pending[chatId];
-    this._save();
-    return p.until > now ? p.kind : null;
+    return p && p.until > now ? p : null;
+  }
+  clearPending(chatId) {
+    if (this.data.pending[chatId]) {
+      delete this.data.pending[chatId];
+      this._save();
+    }
   }
 
   /** Per-chat reply budget. Returns true if another reply is allowed (and counts it). */
@@ -102,6 +109,79 @@ class State {
     }
     list.push(now);
     this.data.replies[chatId] = list;
+    this._save();
+    return true;
+  }
+
+  // ---- daily numbers for the report ----
+  _day(now) {
+    const d = istDate(now);
+    if (!this.data.stats[d]) {
+      this.data.stats[d] = { chats: [] };
+      const keys = Object.keys(this.data.stats).sort();
+      while (keys.length > STATS_DAYS) delete this.data.stats[keys.shift()];
+    }
+    return this.data.stats[d];
+  }
+  bump(name, now = Date.now(), n = 1) {
+    const day = this._day(now);
+    day[name] = (day[name] || 0) + n;
+    this._save();
+  }
+  noteChat(chatId, now = Date.now()) {
+    const day = this._day(now);
+    if (!day.chats.includes(chatId)) day.chats.push(chatId);
+  }
+  statsFor(dateStr) {
+    const day = this.data.stats[dateStr] || { chats: [] };
+    return { ...day, chats: day.chats.length };
+  }
+  lastReportDate() {
+    return this.data.lastReportDate;
+  }
+  setLastReportDate(d) {
+    this.data.lastReportDate = d;
+    this._save();
+  }
+
+  // ---- website leads ----
+  saveLead(lead) {
+    this.data.leads[lead.ref] = lead;
+    this._save();
+  }
+  getLead(ref) {
+    return this.data.leads[ref] || null;
+  }
+  allLeads() {
+    return Object.values(this.data.leads);
+  }
+  /** A lead we are still collecting answers from, matched by chat id or phone. */
+  collectingLeadFor(chatId, phoneKeyValue) {
+    return (
+      this.allLeads().find(
+        (l) =>
+          !l.completed &&
+          l.started &&
+          (l.chatId === chatId || (phoneKeyValue && l.phone && l.phone.slice(-10) === phoneKeyValue)),
+      ) || null
+    );
+  }
+  recentLeadByPhone(phone, now, windowMs = 24 * HOUR) {
+    return this.allLeads().find((l) => l.phone === phone && now - l.createdAt < windowMs) || null;
+  }
+  /** Caps how many website submissions are accepted per hour (abuse brake). */
+  allowIntake(limitPerHour, now = Date.now()) {
+    this.data.intake = this.data.intake.filter((t) => now - t < HOUR);
+    if (this.data.intake.length >= limitPerHour) return false;
+    this.data.intake.push(now);
+    this._save();
+    return true;
+  }
+  /** Caps first messages the bot starts by itself per day. */
+  allowProactive(limitPerDay, now = Date.now()) {
+    this.data.leadSends = this.data.leadSends.filter((t) => now - t < 24 * HOUR);
+    if (this.data.leadSends.length >= limitPerDay) return false;
+    this.data.leadSends.push(now);
     this._save();
     return true;
   }

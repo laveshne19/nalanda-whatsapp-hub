@@ -23,8 +23,8 @@ const MENU_DIGIT = { 1: 'tracking', 2: 'order', 3: 'bulk', 4: 'human' };
 const RE = {
   optOut: /^\s*(stop|unsubscribe|opt[\s-]?out|band\s+karo)\s*[.!]?\s*$/i,
   optIn: /^\s*(start|subscribe)\s*[.!]?\s*$/i,
-  human:
-    /\b(human|agent|representative|executive|real person|call me|speak to|talk to|complaint|refund|cancel(lation)?|baat\s+karni)\b/i,
+  human: /\b(human|agent|representative|executive|real person|call me|speak to|talk to|complaint|refund|baat\s+karni)\b/i,
+  cancel: /\bcancel(l?ation|led)?\b|\bcancel\s+(kar|karo|karna)\b/i,
   trackingStrong:
     /\b(track(ing)?|where\s+is\s+my|order\s+status|status\s+of\s+(my\s+)?order|awb|docket|kab\s+(tak\s+)?(aayega|ayega|milega|pahunchega)|kahan\s+hai)\b/i,
   trackingWeak: /\b(dispatch(ed)?|shipped|shipment|delivery|delivered|courier|parcel)\b/i,
@@ -46,6 +46,7 @@ function classify(text) {
   if (RE.optIn.test(t)) return { intent: 'opt_in', orderNumber: null };
   if (/^\s*[1-4]\s*$/.test(t)) return { intent: MENU_DIGIT[t.trim()], orderNumber: null };
   if (RE.human.test(t)) return { intent: 'human', orderNumber };
+  if (RE.cancel.test(t)) return { intent: 'cancel', orderNumber };
   if (RE.trackingStrong.test(t)) return { intent: 'tracking', orderNumber };
   if (RE.bulk.test(t)) return { intent: 'bulk', orderNumber: null };
   if (RE.trackingWeak.test(t)) return { intent: 'tracking', orderNumber };

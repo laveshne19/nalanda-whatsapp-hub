@@ -35,7 +35,28 @@ function createClient({ baseUrl, apiKey, sessionId, fetchImpl = fetch, timeoutMs
     return { messageId: data.messageId || null };
   }
 
-  return { sendText };
+  /**
+   * Make sure OpenWA calls this hub: list the session's webhooks, create ours if missing.
+   * Safe to run on every start. If a webhook for the url exists it is left alone.
+   */
+  async function ensureWebhook({ url, secret, events }) {
+    const headers = { 'content-type': 'application/json', 'x-api-key': apiKey };
+    const listRes = await fetchImpl(`${base}/api/sessions/${enc}/webhooks`, { headers, signal: AbortSignal.timeout(timeoutMs) });
+    if (!listRes.ok) throw new Error(`OpenWA webhook list failed: HTTP ${listRes.status}`);
+    const existing = await listRes.json();
+    if (Array.isArray(existing) && existing.some((w) => w.url === url)) return { created: false };
+
+    const res = await fetchImpl(`${base}/api/sessions/${enc}/webhooks`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ url, events, secret, retryCount: 3 }),
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) throw new Error(`OpenWA webhook create failed: HTTP ${res.status}`);
+    return { created: true };
+  }
+
+  return { sendText, ensureWebhook };
 }
 
 module.exports = { verifySignature, createClient };
