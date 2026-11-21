@@ -89,6 +89,10 @@ const T = {
   human: (hours) =>
     'Okay, I have passed this to our team and they will reply here soon.' + (hours ? ` Our hours: ${hours}.` : ''),
 
+  support: () =>
+    'Sorry about that, and thank you for telling us. I have passed this to our support team with your message, ' +
+    'and they will reply here soon. If you have your order number or a photo of the problem, please send it here.',
+
   unknown: () =>
     'Sorry, I did not catch that. Reply 1 to track an order, 2 for orders and products, ' +
     '3 for bulk or corporate enquiries, or 4 to talk to our team.',

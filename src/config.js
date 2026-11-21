@@ -54,8 +54,8 @@ function fromEnv(env = process.env) {
       staleMinutes: Number(env.LEAD_STALE_MINUTES || 30),
     },
     statePath: (env.STATE_PATH || './data/state.json').trim(),
-    // Off until verified on the live number: needs OpenWA message ids to match send responses.
-    staffReplyPauses: (env.STAFF_REPLY_PAUSES || '').trim().toLowerCase() === 'true',
+    // When a person replies by hand in a chat, the bot stays quiet there. On unless switched off.
+    staffReplyPauses: (env.STAFF_REPLY_PAUSES || 'true').trim().toLowerCase() !== 'false',
     limits: {
       repliesPerChatPerHour: Number(env.REPLIES_PER_CHAT_PER_HOUR || 10),
       handoffHours: Number(env.HANDOFF_HOURS || 12),

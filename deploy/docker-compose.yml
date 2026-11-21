@@ -61,7 +61,7 @@ services:
       start_period: 60s
 
   nalanda-hub:
-    image: ghcr.io/laveshne19/nalanda-whatsapp-hub:0.2.4
+    image: ghcr.io/laveshne19/nalanda-whatsapp-hub:0.3.0
     container_name: nalanda-hub
     restart: unless-stopped
     depends_on:
@@ -91,6 +91,7 @@ services:
       - STAFF_CHAT_ID=919569913332@c.us
       - WHOLESALE_CONTACT=+91 95699 13332
       - REPORT_HOUR_IST=20
+      - REPLIES_PER_CHAT_PER_HOUR=${REPLIES_PER_CHAT_PER_HOUR:-10}
       - STATE_PATH=/app/data/state.json
     volumes:
       - hub-data:/app/data

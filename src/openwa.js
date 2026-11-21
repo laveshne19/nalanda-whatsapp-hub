@@ -44,7 +44,20 @@ function createClient({ baseUrl, apiKey, sessionId, fetchImpl = fetch, timeoutMs
     const listRes = await fetchImpl(`${base}/api/sessions/${enc}/webhooks`, { headers, signal: AbortSignal.timeout(timeoutMs) });
     if (!listRes.ok) throw new Error(`OpenWA webhook list failed: HTTP ${listRes.status}`);
     const existing = await listRes.json();
-    if (Array.isArray(existing) && existing.some((w) => w.url === url)) return { created: false };
+    const mine = Array.isArray(existing) ? existing.find((w) => w.url === url) : null;
+    if (mine) {
+      const have = Array.isArray(mine.events) ? mine.events : [];
+      const missing = events.filter((e) => !have.includes(e) && !have.includes('*'));
+      if (!missing.length) return { created: false, updated: false };
+      const upd = await fetchImpl(`${base}/api/sessions/${enc}/webhooks/${encodeURIComponent(mine.id)}`, {
+        method: 'PUT',
+        headers,
+        body: JSON.stringify({ events: [...new Set([...have, ...events])] }),
+        signal: AbortSignal.timeout(timeoutMs),
+      });
+      if (!upd.ok) throw new Error(`OpenWA webhook update failed: HTTP ${upd.status}`);
+      return { created: false, updated: true };
+    }
 
     const res = await fetchImpl(`${base}/api/sessions/${enc}/webhooks`, {
       method: 'POST',

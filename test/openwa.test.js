@@ -82,3 +82,31 @@ test('ensureWebhook reports failures instead of hiding them', async () => {
   const client = createClient({ baseUrl: 'https://wa.example', apiKey: 'k', sessionId: 's1', fetchImpl: async () => ({ ok: false, status: 401 }) });
   await assert.rejects(() => client.ensureWebhook({ url: 'u', secret: 'x'.repeat(20), events: ['message.received'] }), /401/);
 });
+
+test('ensureWebhook adds a missing event to a webhook that already exists', async () => {
+  const calls = [];
+  const client = createClient({
+    baseUrl: 'https://wa.example', apiKey: 'k', sessionId: 's1',
+    fetchImpl: async (url, init = {}) => {
+      calls.push({ url, method: init.method || 'GET', body: init.body });
+      return { ok: true, json: async () => [{ id: 'W1', url: 'http://nalanda-hub:8080/webhook/openwa', events: ['message.received'] }] };
+    },
+  });
+  const r = await client.ensureWebhook({ url: 'http://nalanda-hub:8080/webhook/openwa', secret: 'x'.repeat(20), events: ['message.received', 'message.sent'] });
+  assert.deepEqual(r, { created: false, updated: true });
+  const put = calls.find((c) => c.method === 'PUT');
+  assert.match(put.url, /\/webhooks\/W1$/);
+  assert.deepEqual(JSON.parse(put.body).events, ['message.received', 'message.sent']);
+});
+
+test('ensureWebhook leaves a webhook alone when it already has every event, or "*"', async () => {
+  for (const events of [['message.received', 'message.sent'], ['*']]) {
+    let puts = 0;
+    const client = createClient({
+      baseUrl: 'https://wa.example', apiKey: 'k', sessionId: 's1',
+      fetchImpl: async (url, init = {}) => { if (init.method === 'PUT') puts++; return { ok: true, json: async () => [{ id: 'W1', url: 'u', events }] }; },
+    });
+    assert.deepEqual(await client.ensureWebhook({ url: 'u', secret: 'x'.repeat(20), events: ['message.received', 'message.sent'] }), { created: false, updated: false });
+    assert.equal(puts, 0);
+  }
+});

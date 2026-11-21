@@ -30,7 +30,10 @@ const RE = {
   trackingWeak: /\b(dispatch(ed)?|shipped|shipment|delivery|delivered|courier|parcel)\b/i,
   bulk: /\b(bulk|wholesale|corporate|gifting|gifts?|dealer(ship)?|distributor|distribution|reseller|quantity|qty|quotation|quote|gst\s+invoice|thok|\d+\s*(pcs|pieces|units|nos))\b/i,
   order: /\b(order|buy|purchase|price|rate|catalogue|catalog|available|availability|stock|kharidna|chahiye)\b/i,
-  greeting: /^\s*(hi+|hello|hey+|namaste|namaskar|good\s+(morning|afternoon|evening)|menu|help)\b/i,
+  // Only a message that is nothing but a greeting. "Good evening Sir, any requirement of ..." is not one.
+  greeting: /^\s*(hi+|hello+|hey+|hlo+|namaste|namaskar|good\s+(morning|afternoon|evening)|menu|help)(\s+(sir|mam|madam|ji|team))?\s*[.!?]*\s*$/i,
+  support:
+    /\b(not working|doesn'?t work|stopped working|not charging|defective|damaged|broken|warranty|repair|replace(ment)?|how to (install|use|connect|pair|set\s?up|fix)|installation|return)\b/i,
 };
 
 /**
@@ -48,6 +51,7 @@ function classify(text) {
   if (RE.human.test(t)) return { intent: 'human', orderNumber };
   if (RE.cancel.test(t)) return { intent: 'cancel', orderNumber };
   if (RE.trackingStrong.test(t)) return { intent: 'tracking', orderNumber };
+  if (RE.support.test(t)) return { intent: 'support', orderNumber };
   if (RE.bulk.test(t)) return { intent: 'bulk', orderNumber: null };
   if (RE.trackingWeak.test(t)) return { intent: 'tracking', orderNumber };
   if (RE.order.test(t)) {

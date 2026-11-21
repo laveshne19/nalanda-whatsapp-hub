@@ -13,7 +13,7 @@ const YES = /^\s*(yes|y|yeah|yep|confirm(ed)?|haan|han|ha)\s*[.!]?\s*$/i;
 const NO = /^\s*(no|n|nope|nahi|nahin|keep it)\s*[.!]?\s*$/i;
 
 function senderOf(data) {
-  const chatId = data.from;
+  const chatId = data.chatId || data.from;
   const raw = data.senderPhone || (/@c\.us$/.test(chatId || '') ? chatId.split('@')[0] : '');
   return { chatId, phone: phoneKey(raw) ? raw : '' };
 }
@@ -21,6 +21,19 @@ function senderOf(data) {
 function maskPhone(p) {
   const d = String(p || '').replace(/\D/g, '');
   return d ? `***${d.slice(-4)}` : 'unknown';
+}
+
+// Messages written by machines (brand support tickets, OTPs, courier alerts, bank scams). The bot never answers these.
+const AUTOMATED = [
+  /^\s*dear\s+(customer|user|sir|madam)\b/i,
+  /\bservice\s+ticket\b/i,
+  /\b(otp|one[- ]time\s+password)\b/i,
+  /\brider\s+has\s+(picked|delivered)\b/i,
+  /\b(udgam|rbi)\b/i,
+];
+function looksAutomated(body) {
+  const t = String(body || '');
+  return t.length > 800 || AUTOMATED.some((re) => re.test(t));
 }
 
 const isOwner = (config, phone) =>
@@ -36,10 +49,14 @@ async function handleEvent(payload, deps) {
   const log = deps.log || (() => {});
   const data = (payload && payload.data) || {};
 
-  // A person replying from the phone itself pauses the bot for that chat (opt-in, see README).
+  // A person replying from the phone pauses the bot for that chat. Our own messages are told apart
+  // by id and by the words we sent, so the bot never mistakes itself for a person.
   if (payload.event === 'message.sent') {
-    if (config.staffReplyPauses && data.id && !state.isBotMessage(data.id) && data.to && !data.isGroup) {
-      state.startHandoff(data.to, config.limits.handoffHours * HOUR, now);
+    const chat = data.chatId || data.to;
+    const ours = (data.id && state.isBotMessage(data.id)) || state.wasBotText(chat, data.body, now);
+    if (config.staffReplyPauses && chat && !data.isGroup && data.kind !== 'group' && !ours) {
+      state.startHandoff(chat, config.limits.handoffHours * HOUR, now);
+      state.bump('staff_replies', now);
       return { action: 'handoff_by_staff' };
     }
     return { action: 'ignored' };
@@ -58,6 +75,11 @@ async function handleEvent(payload, deps) {
   if (isOwner(config, phone)) {
     const out = await ownerCommand(body, deps, chatId, now);
     if (out) return out;
+  }
+
+  if (looksAutomated(body)) {
+    state.bump('automated', now);
+    return { action: 'ignored_automated' };
   }
 
   const textual = !data.type || data.type === 'chat' || data.type === 'text';
@@ -118,12 +140,20 @@ async function handleEvent(payload, deps) {
         handoff: { kind: 'Needs a person', phone, body },
         startHandoff: true,
       });
+    case 'support':
+      return reply(deps, chatId, T.support(), intent, now, {
+        handoff: { kind: 'Support or return request', phone, body },
+        startHandoff: true,
+      });
     case 'cancel':
       return handleCancel({ deps, chatId, phone, body, orderNumber, now });
     case 'tracking':
       return handleTracking({ deps, chatId, phone, body, orderNumber, now });
     default:
-      return reply(deps, chatId, T.unknown(), 'unknown', now);
+      // Not understood: say nothing. This number is also used for suppliers, dealers and staff chats,
+      // so a guess would be worse than silence. The daily report counts these for your team.
+      state.bump('silent', now);
+      return { action: 'silent' };
   }
 }
 
@@ -341,6 +371,7 @@ async function intakeLead(input, deps) {
   if (config.leads.proactive && state.allowProactive(config.leads.proactivePerDay, now)) {
     try {
       const text = lead.step === 'done' ? T.leadDone(lead, leads.grade(lead)) : T.leadHello(lead, T.leadAsk(lead.step, lead));
+      state.rememberBotText(lead.chatId, text, now);
       const sent = await deps.openwa.sendText(lead.chatId, text);
       if (sent && sent.messageId) state.rememberBotMessage(sent.messageId);
       started = true;
@@ -381,6 +412,7 @@ async function reply(deps, chatId, text, intent, now, opts = {}) {
     return { action: 'rate_limited', intent };
   }
   try {
+    state.rememberBotText(chatId, text, now);
     const sent = await openwa.sendText(chatId, text);
     if (sent && sent.messageId) state.rememberBotMessage(sent.messageId);
   } catch (e) {

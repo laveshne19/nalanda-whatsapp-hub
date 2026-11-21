@@ -68,7 +68,8 @@ test('config refuses to start without a strong webhook secret', () => {
   assert.throws(() => fromEnv({ ...base, WEBHOOK_SECRET: 'short' }), /16 characters/);
   const ok = fromEnv({ ...base, WEBHOOK_SECRET: 'x'.repeat(20) });
   assert.equal(ok.shopify, null);
-  assert.equal(ok.staffReplyPauses, false);
+  assert.equal(ok.staffReplyPauses, true); // staff replies pause the bot unless switched off
+  assert.equal(fromEnv({ ...base, WEBHOOK_SECRET: 'x'.repeat(20), STAFF_REPLY_PAUSES: 'false' }).staffReplyPauses, false);
 });
 
 // ---- website lead endpoint ----

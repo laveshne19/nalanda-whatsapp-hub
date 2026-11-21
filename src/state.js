@@ -1,5 +1,6 @@
 'use strict';
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const path = require('node:path');
 const { istDate } = require('./util');
 
@@ -55,6 +56,19 @@ class State {
     this.data.botMsgs.push(String(id));
     if (this.data.botMsgs.length > 2000) this.data.botMsgs.splice(0, this.data.botMsgs.length - 2000);
     this._save();
+  }
+  /** Remember the words the bot sent to a chat for a short while, in case message ids do not line up. */
+  rememberBotText(chatId, text, now = Date.now()) {
+    const key = crypto.createHash('sha1').update(`${chatId}|${String(text).replace(/\s+/g, ' ').trim()}`).digest('hex');
+    this._botTexts = this._botTexts || new Map();
+    this._botTexts.set(key, now);
+    if (this._botTexts.size > 500) this._botTexts.delete(this._botTexts.keys().next().value);
+  }
+  wasBotText(chatId, text, now = Date.now(), windowMs = 10 * 60 * 1000) {
+    if (!this._botTexts) return false;
+    const key = crypto.createHash('sha1').update(`${chatId}|${String(text || '').replace(/\s+/g, ' ').trim()}`).digest('hex');
+    const at = this._botTexts.get(key);
+    return Boolean(at) && now - at < windowMs;
   }
   isBotMessage(id) {
     return this.data.botMsgs.includes(String(id));

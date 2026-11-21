@@ -35,6 +35,8 @@ function buildReport(state, config, now = Date.now()) {
     `Website leads: ${n('lead_new')} new. Hot ${n('lead_hot')}, warm ${n('lead_warm')}, small ${n('lead_low')}, ` +
       `single piece ${n('lead_single')}, not interested ${n('lead_closed')}.`,
     `Passed to the team: ${n('handoff')}.`,
+    `Left for your team (the bot stayed quiet): ${n('silent')}. Machine messages ignored: ${n('automated')}. ` +
+      `Chats where your staff replied by hand: ${n('staff_replies')}.`,
   ];
   const problems = n('send_failed') + n('rate_limited');
   if (problems) lines.push(`Needs a look: ${n('send_failed')} failed sends, ${n('rate_limited')} held back by limits.`);

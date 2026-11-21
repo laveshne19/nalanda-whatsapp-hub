@@ -33,6 +33,13 @@ const cases = [
   ['unsubscribe', 'opt_out'],
   ['start', 'opt_in'],
   ['asdfgh', 'unknown'],
+  ['Good evening Sir, currently any requirement of our belkin and logitech products', 'unknown'],
+  ['Hello sir', 'menu'],
+  ['Good morning', 'menu'],
+  ['How to install', 'support'],
+  ['I want to return my parcel, which I ordered from your website', 'support'],
+  ['my earbuds are not working', 'support'],
+  ['warranty claim for my watch', 'support'],
   ['', 'unknown'],
 ];
 

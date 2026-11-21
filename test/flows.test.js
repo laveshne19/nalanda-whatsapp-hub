@@ -382,3 +382,92 @@ test('a stranger saying "quote" without a matching enquiry is not pulled into a 
   await handleEvent(msg('can I get a quote for 5 laptops', { from: '917777777777@c.us' }), deps);
   assert.match(to(sent, '917777777777@c.us')[0].text, /Please share in one message/); // normal bulk path
 });
+
+// ---- safer behaviour on a busy, shared inbox ----
+test('anything the bot does not understand gets silence, not a guess', async () => {
+  const { deps, sent, state } = setup();
+  const r = await handleEvent(msg('Good evening Sir, any requirement of our belkin and logitech products'), deps);
+  assert.equal(r.action, 'silent');
+  assert.equal(sent.length, 0);
+  assert.equal(state.statsFor(istDate(T0)).silent, 1);
+});
+
+test('machine messages are ignored and never answered', async () => {
+  const { deps, sent, state } = setup();
+  for (const body of [
+    'Dear customer, Your original product for the service ticket number 70990412 is received',
+    'Your OTP is 482913, do not share',
+    'Our rider has picked up [3]/[3] shipments. We truly appreciate it!',
+    'Aapko apne sabhi bank khate yaad nahi hain? RBI ke UDGAM portal se madad lein',
+    'x'.repeat(900),
+  ]) assert.equal((await handleEvent(msg(body), deps)).action, 'ignored_automated');
+  assert.equal(sent.length, 0);
+  assert.equal(state.statsFor(istDate(T0)).automated, 5);
+});
+
+test('a customer asking how to install gets a proper support reply, and your team is told', async () => {
+  const { deps, sent, state } = setup();
+  await handleEvent(msg('How to install'), deps);
+  assert.match(to(sent, CUSTOMER)[0].text, /passed this to our support team/);
+  assert.match(to(sent, OWNER)[0].text, /^\[Support or return request\]/);
+  assert.equal(state.handoffActive(CUSTOMER, T0), true);
+});
+
+test('a plain hello still gets the menu', async () => {
+  const { deps, sent } = setup();
+  await handleEvent(msg('Hello sir'), deps);
+  assert.match(to(sent, CUSTOMER)[0].text, /Track my order/);
+});
+
+test('when your staff reply by hand the bot goes quiet in that chat', async () => {
+  const { deps, sent, state } = setup({ config: { staffReplyPauses: true } });
+  await handleEvent({ event: 'message.sent', data: { id: 'HUMAN1', chatId: CUSTOMER, to: CUSTOMER, body: 'Sir your parcel goes tomorrow' } }, deps);
+  assert.equal(state.handoffActive(CUSTOMER, T0), true);
+  const r = await handleEvent(msg('ok thanks, where is my order #1234'), deps);
+  assert.equal(r.action, 'human_handling');
+  assert.equal(sent.length, 0);
+  assert.equal(state.statsFor(istDate(T0)).staff_replies, 1);
+});
+
+test('the bot never mistakes its own message for a person, even when WhatsApp reports it first', async () => {
+  const { deps, sent, state } = setup({ config: { staffReplyPauses: true } });
+  // simulate: the "message sent" notice arrives BEFORE the send call returns, with a different id
+  deps.openwa = {
+    sendText: async (chatId, text) => {
+      await handleEvent({ event: 'message.sent', data: { id: 'WA-ID-NOT-KNOWN-YET', chatId, to: chatId, body: text } }, deps);
+      sent.push({ chatId, text });
+      return { messageId: 'later-id' };
+    },
+  };
+  await handleEvent(msg('Hello'), deps);
+  assert.equal(state.handoffActive(CUSTOMER, T0), false);
+  const again = await handleEvent(msg('hi'), deps);
+  assert.equal(again.action, 'replied');
+});
+
+test('a media message sent by staff (catalogue, invoice) also pauses the bot', async () => {
+  const { deps, state } = setup({ config: { staffReplyPauses: true } });
+  await handleEvent({ event: 'message.sent', data: { id: 'DOC1', chatId: CUSTOMER, to: CUSTOMER, body: '', type: 'document' } }, deps);
+  assert.equal(state.handoffActive(CUSTOMER, T0), true);
+});
+
+test('staff messages in groups do not pause anything', async () => {
+  const { deps, state } = setup({ config: { staffReplyPauses: true } });
+  const r = await handleEvent({ event: 'message.sent', data: { id: 'G1', chatId: '1203@g.us', to: '1203@g.us', isGroup: true, body: 'hello team' } }, deps);
+  assert.equal(r.action, 'ignored');
+  assert.equal(state.handoffActive('1203@g.us', T0), false);
+});
+
+test('the owner alerts the bot itself sends do not count as staff replies', async () => {
+  const { deps, state } = setup({ config: { staffReplyPauses: true } });
+  await handleEvent(msg('I need wholesale rates for power banks'), deps);
+  // OpenWA reports the alert the bot sent to the owner as a sent message
+  await handleEvent({ event: 'message.sent', data: { id: 'X', chatId: OWNER, to: OWNER, body: '[Bulk or wholesale enquiry] from +919876543210: I need wholesale rates for power banks' } }, deps);
+  assert.equal(state.handoffActive(OWNER, T0), false);
+});
+
+test('the daily report says how many chats were left for your team', async () => {
+  const { deps, state } = setup();
+  await handleEvent(msg('Good evening Sir, any requirement of our belkin products'), deps);
+  assert.match(buildReport(state, deps.config, T0), /Left for your team \(the bot stayed quiet\): 1\./);
+});

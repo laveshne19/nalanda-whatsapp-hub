@@ -45,3 +45,18 @@ test('staff note is trimmed and single line', () => {
   assert.ok(note.length < 400);
   assert.ok(!note.includes('\n'));
 });
+
+test('docs/TEMPLATES.md matches the code (run npm run templates after changing wording)', () => {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  const { render } = require('../src/templates-doc');
+  const onDisk = fs.readFileSync(path.join(__dirname, '..', 'docs', 'TEMPLATES.md'), 'utf8');
+  assert.equal(onDisk, render());
+});
+
+test('the saved templates contain no dash characters and every message is short enough for WhatsApp', () => {
+  const { render } = require('../src/templates-doc');
+  const text = render();
+  assert.ok(!/[\u2014\u2013]/.test(text), 'a dash character crept into a template');
+  for (const block of text.split('\n\n')) assert.ok(block.length < 1200);
+});
