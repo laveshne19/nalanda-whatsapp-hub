@@ -184,7 +184,7 @@ test('a second 401 gives up instead of looping', async () => {
 test('a refused token request reports Shopify\'s own reason and never the secret', async () => {
   const p = createTokenProvider({
     domain: 'd', clientId: 'cid', clientSecret: 'TOP-SECRET-VALUE',
-    fetchImpl: async () => ({ ok: false, status: 400, json: async () => ({ error: 'invalid_client', error_description: 'Client authentication failed' }) }),
+    fetchImpl: async () => ({ ok: false, status: 400, text: async () => JSON.stringify({ error: 'invalid_client', error_description: 'Client authentication failed' }) }),
   });
   await assert.rejects(() => p.getToken(), (e) => {
     assert.match(e.message, /HTTP 400 \(invalid_client: Client authentication failed\)/);
@@ -194,6 +194,12 @@ test('a refused token request reports Shopify\'s own reason and never the secret
 });
 
 test('a refusal with an unreadable body still reports the status', async () => {
-  const p = createTokenProvider({ domain: 'd', clientId: 'a', clientSecret: 'b', fetchImpl: async () => ({ ok: false, status: 400, json: async () => { throw new Error('not json'); } }) });
+  const p = createTokenProvider({ domain: 'd', clientId: 'a', clientSecret: 'b', fetchImpl: async () => ({ ok: false, status: 400, text: async () => { throw new Error('unreadable'); } }) });
   await assert.rejects(() => p.getToken(), /HTTP 400$/);
+});
+
+test('a refusal that comes back as a web page reports the reason from its title', async () => {
+  const page = '<!DOCTYPE html><html><head><title>400 - Oauth error app_not_installed</title></head><body>...</body></html>';
+  const p = createTokenProvider({ domain: 'd', clientId: 'a', clientSecret: 'b', fetchImpl: async () => ({ ok: false, status: 400, text: async () => page }) });
+  await assert.rejects(() => p.getToken(), /HTTP 400 \(400 - Oauth error app_not_installed\)/);
 });

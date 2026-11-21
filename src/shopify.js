@@ -36,15 +36,24 @@ function createTokenProvider({ domain, clientId, clientSecret, staticToken, fetc
       signal: AbortSignal.timeout(15000),
     });
     if (!res.ok) {
-      // Shopify explains a refusal in its reply (for example "invalid_client"). Log that reason, never our secret.
-      let detail = '';
+      // Shopify explains a refusal either as JSON ({"error": ...}) or as a web page whose title says
+      // why (for example "400 - Oauth error app_not_installed"). Log that reason, never our secret.
+      let text = '';
       try {
-        const b = await res.json();
-        const parts = [typeof b.error === 'string' ? b.error : '', typeof b.error_description === 'string' ? b.error_description : ''];
-        detail = parts.filter(Boolean).join(': ').replace(/\s+/g, ' ').slice(0, 200);
+        text = await res.text();
       } catch {
         /* no readable body */
       }
+      let detail = '';
+      try {
+        const b = JSON.parse(text);
+        const parts = [typeof b.error === 'string' ? b.error : '', typeof b.error_description === 'string' ? b.error_description : ''];
+        detail = parts.filter(Boolean).join(': ');
+      } catch {
+        const t = /<title>([^<]{1,200})<\/title>/i.exec(text);
+        if (t) detail = t[1];
+      }
+      detail = detail.replace(/\s+/g, ' ').trim().slice(0, 200);
       throw new Error(`Shopify token request failed: HTTP ${res.status}${detail ? ` (${detail})` : ''}`);
     }
     const body = await res.json();
