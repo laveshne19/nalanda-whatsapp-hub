@@ -25,4 +25,24 @@ function clean(value, max = 200) {
     .slice(0, max);
 }
 
-module.exports = { istDate, istHour, istPretty, clean };
+/**
+ * Run an async function, retrying on failure. Used at start-up, when OpenWA may still be
+ * coming up after a restart. Throws the last error once the attempts run out.
+ */
+async function retry(fn, { tries = 12, delayMs = 15000, onRetry = () => {}, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) } = {}) {
+  let lastError;
+  for (let attempt = 1; attempt <= tries; attempt++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastError = e;
+      if (attempt < tries) {
+        onRetry(attempt, e);
+        await sleep(delayMs);
+      }
+    }
+  }
+  throw lastError;
+}
+
+module.exports = { istDate, istHour, istPretty, clean, retry };

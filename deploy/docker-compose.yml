@@ -61,11 +61,12 @@ services:
       start_period: 60s
 
   nalanda-hub:
-    image: ghcr.io/laveshne19/nalanda-whatsapp-hub:0.2.1
+    image: ghcr.io/laveshne19/nalanda-whatsapp-hub:0.2.2
     container_name: nalanda-hub
     restart: unless-stopped
     depends_on:
-      - openwa-api
+      openwa-api:
+        condition: service_healthy
     security_opt:
       - 'no-new-privileges:true'
     cap_drop:

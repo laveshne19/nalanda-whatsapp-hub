@@ -148,3 +148,27 @@ test('config builds Shopify access from a client id and secret, or from a fixed 
   assert.equal(fromEnv({ ...base, SHOPIFY_SHOP_DOMAIN: 'a.myshopify.com', SHOPIFY_CLIENT_ID: 'id' }).shopify, null); // secret missing
   assert.equal(fromEnv({ ...base }).shopify, null);
 });
+
+// ---- start-up retry ----
+const { retry } = require('../src/util');
+
+test('retry keeps trying until it works, and tells us about each failed attempt', async () => {
+  let calls = 0;
+  const notes = [];
+  const out = await retry(async () => { if (++calls < 3) throw new Error('not ready'); return 'ok'; }, { tries: 5, delayMs: 0, sleep: async () => {}, onRetry: (n, e) => notes.push(`${n}:${e.message}`) });
+  assert.equal(out, 'ok');
+  assert.equal(calls, 3);
+  assert.deepEqual(notes, ['1:not ready', '2:not ready']);
+});
+
+test('retry gives up after the last attempt and throws the real error', async () => {
+  let calls = 0;
+  await assert.rejects(() => retry(async () => { calls++; throw new Error('still down'); }, { tries: 4, delayMs: 0, sleep: async () => {} }), /still down/);
+  assert.equal(calls, 4);
+});
+
+test('retry succeeds first time without waiting', async () => {
+  let slept = 0;
+  assert.equal(await retry(async () => 7, { tries: 3, sleep: async () => { slept++; } }), 7);
+  assert.equal(slept, 0);
+});

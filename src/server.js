@@ -5,6 +5,7 @@ const { State } = require('./state');
 const { createClient, verifySignature } = require('./openwa');
 const { handleEvent, intakeLead } = require('./handler');
 const { maybeSendDailyReport, sweepLeads } = require('./report');
+const { retry } = require('./util');
 
 const MAX_BODY = 256 * 1024;
 const MAX_LEAD_BODY = 32 * 1024;
@@ -116,8 +117,11 @@ if (require.main === module) {
   // Tell OpenWA where to send messages. Failure is logged, never fatal (it can be set in the dashboard instead).
   if (config.hubWebhookUrl) {
     const events = config.staffReplyPauses ? ['message.received', 'message.sent'] : ['message.received'];
-    openwa
-      .ensureWebhook({ url: config.hubWebhookUrl, secret: config.webhookSecret, events })
+    retry(() => openwa.ensureWebhook({ url: config.hubWebhookUrl, secret: config.webhookSecret, events }), {
+      tries: 20,
+      delayMs: 15000,
+      onRetry: (n, e) => log(`[hub] OpenWA not ready yet (${e.message}), trying again (${n}/19)`),
+    })
       .then((r) => log(`[hub] webhook ${r.created ? 'registered' : 'already present'} in OpenWA`))
       .catch((e) => log(`[hub] could not register webhook automatically: ${e.message}`));
   }
