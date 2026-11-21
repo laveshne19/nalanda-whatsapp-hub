@@ -332,3 +332,53 @@ test('owner can mark a lead as done and it leaves the call list', async () => {
   await handleEvent(msg('leads', { from: OWNER }), deps);
   assert.match(to(sent, OWNER).pop().text, /No leads waiting/);
 });
+
+// ---- real form shape ----
+const real = (over = {}) => ({
+  name: 'Rahul Sharma', company: 'ABC Pharma Ltd', phone: '+91 98765 43212', email: 'r@abc.com',
+  occasion: 'Diwali / Festive Gifting', quantity: '50 – 200 pieces', budget: 'Rs.1,000 – Rs.2,500', message: '',
+  source: 'corporategiftingindia.co', ...over,
+});
+const REAL_CHAT = '919876543212@c.us';
+
+test('real form: the bot asks the item and exact units, mentioning the occasion', async () => {
+  const { deps, sent } = setup();
+  await intakeLead(real(), deps);
+  const first = to(sent, REAL_CHAT)[0].text;
+  assert.match(first, /Hi Rahul, this is Nalanda Enterprises\. Thanks for your enquiry for Diwali \/ Festive Gifting/);
+  assert.match(first, /which item are you looking for, and roughly how many units/);
+  assert.match(first, /Reply STOP to opt out/);
+});
+
+test('real form: a full conversation ends with one HOT alert that carries the form details', async () => {
+  const { deps, sent } = setup();
+  const out = await intakeLead(real(), deps);
+  await handleEvent(msg('Borosil lunch boxes, 120 pcs', { from: REAL_CHAT }), deps);
+  await handleEvent(msg('before 10 Dec, with company logo', { from: REAL_CHAT }), deps);
+  const alert = to(sent, OWNER).pop().text;
+  assert.match(alert, new RegExp(`^\\[HOT lead ${out.ref}\\] Rahul Sharma, \\+919876543212, ABC Pharma Ltd`));
+  assert.match(alert, /120 units/);
+  assert.match(alert, /for Diwali \/ Festive Gifting, budget Rs\.1,000/);
+  assert.match(alert, /CALL NOW/);
+});
+
+test('a plain hello during the questions repeats the question instead of becoming the answer', async () => {
+  const { deps, sent, state } = setup();
+  const out = await intakeLead(real(), deps);
+  await handleEvent(msg('hi', { from: REAL_CHAT }), deps);
+  assert.match(to(sent, REAL_CHAT).pop().text, /Thanks\. Which item are you looking for/);
+  assert.equal(state.getLead(out.ref).product, '');
+});
+
+test('customer who was not messaged yet and writes "I sent an enquiry" is matched by phone', async () => {
+  const { deps, sent } = setup({ config: { leads: { secret: 's', proactive: false, notifyOnCreate: false, proactivePerDay: 30, intakePerHour: 60, staleMinutes: 30 } } });
+  await intakeLead(real(), deps);
+  await handleEvent(msg('Hi, I sent an enquiry on your website', { from: '8888@lid', senderPhone: '919876543212' }), deps);
+  assert.match(to(sent, '8888@lid')[0].text, /which item are you looking for/);
+});
+
+test('a stranger saying "quote" without a matching enquiry is not pulled into a lead', async () => {
+  const { deps, sent } = setup();
+  await handleEvent(msg('can I get a quote for 5 laptops', { from: '917777777777@c.us' }), deps);
+  assert.match(to(sent, '917777777777@c.us')[0].text, /Please share in one message/); // normal bulk path
+});

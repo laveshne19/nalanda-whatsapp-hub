@@ -166,6 +166,15 @@ class State {
       ) || null
     );
   }
+  /** A form lead we have not talked to yet, matched by phone, from the last 48 hours. */
+  unstartedLeadFor(phoneKeyValue, now = Date.now()) {
+    if (!phoneKeyValue) return null;
+    return (
+      this.allLeads().find(
+        (l) => !l.completed && !l.started && l.phone && l.phone.slice(-10) === phoneKeyValue && now - l.createdAt < 48 * HOUR,
+      ) || null
+    );
+  }
   recentLeadByPhone(phone, now, windowMs = 24 * HOUR) {
     return this.allLeads().find((l) => l.phone === phone && now - l.createdAt < windowMs) || null;
   }

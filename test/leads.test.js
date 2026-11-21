@@ -110,3 +110,50 @@ test('control characters and long text in form fields are cleaned', () => {
   assert.ok(!/[\u0000-\u001f]/.test(lead.name));
   assert.ok(lead.note.length <= 500);
 });
+
+// ---- the real corporategiftingindia.co form: ranges, no product field ----
+const realForm = (over = {}) => ({
+  name: 'Rahul Sharma', company: 'ABC Pharma Ltd', phone: '+91 98765 43210', email: 'r@abc.com',
+  occasion: 'Diwali / Festive Gifting', quantity: '50 – 200 pieces', budget: 'Rs.1,000 – Rs.2,500',
+  message: 'Need branded gifts', ...over,
+});
+
+test('a form range is a hint, never read as an exact quantity', () => {
+  const lead = L.createLead(realForm(), 1);
+  assert.equal(lead.qty, null);
+  assert.equal(lead.qtyHint, '50 – 200 pieces');
+  assert.equal(lead.step, 'item'); // the form has no product, so the bot asks
+});
+
+test('every range the form offers is recognised as a hint', () => {
+  for (const q of ['Under 50 pieces', '50 – 200 pieces', '200 – 500 pieces', '500 – 1,000 pieces', '1,000 – 5,000 pieces', 'Above 5,000 pieces']) {
+    const lead = L.createLead(realForm({ quantity: q }), 1);
+    assert.equal(lead.qty, null, q);
+    assert.ok(lead.qtyHint, q);
+  }
+});
+
+test('lower bound of each range', () => {
+  assert.equal(L.hintMin('Under 50 pieces'), 1);
+  assert.equal(L.hintMin('50 – 200 pieces'), 50);
+  assert.equal(L.hintMin('500 – 1,000 pieces'), 500);
+  assert.equal(L.hintMin('Above 5,000 pieces'), 5000);
+  assert.equal(L.hintMin('anything else'), null);
+});
+
+test('range hint decides the grade only while the exact number is unknown', () => {
+  const big = L.createLead(realForm({ quantity: '200 – 500 pieces' }), 1);
+  big.qtyNote = 'not sure';
+  assert.equal(L.grade(big), 'hot');
+  const small = L.createLead(realForm({ quantity: 'Under 50 pieces' }), 1);
+  small.qtyNote = 'not sure';
+  assert.equal(L.grade(small), 'warm');
+  const exact = L.createLead(realForm({ quantity: '200 – 500 pieces' }), 1);
+  exact.qty = 3;
+  assert.equal(L.grade(exact), 'low'); // the customer's own exact answer wins
+});
+
+test('alert summary carries the occasion, budget and the range', () => {
+  const lead = L.createLead(realForm(), 1);
+  assert.match(L.summary(lead), /about 50 – 200 pieces.*for Diwali \/ Festive Gifting, budget Rs\.1,000 – Rs\.2,500/);
+});

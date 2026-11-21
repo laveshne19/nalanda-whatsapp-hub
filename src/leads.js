@@ -46,6 +46,20 @@ function parseQty(text, { loose = false } = {}) {
   return n >= 1 && n <= 1000000 ? n : null;
 }
 
+// The website form offers quantity ranges ("50 - 200 pieces"), not exact numbers.
+// A range is only a hint: the bot still asks for the exact figure.
+const RANGE = /(\d[\d,]*)\s*(?:\u2013|\u2014|-|to)\s*(\d[\d,]*)|\b(?:under|below|above|over)\s*(\d[\d,]*)/i;
+
+function hintMin(text) {
+  const t = String(text || '');
+  const num = (x) => parseInt(String(x).replace(/,/g, ''), 10);
+  let m = /\b(?:above|over)\s*(\d[\d,]*)/i.exec(t);
+  if (m) return num(m[1]);
+  if (/\b(?:under|below)\b/i.test(t)) return 1;
+  m = /(\d[\d,]*)\s*(?:\u2013|\u2014|-|to)\s*\d[\d,]*/i.exec(t);
+  return m ? num(m[1]) : null;
+}
+
 const NOT_INTERESTED =
   /\b(not interested|no requirement|no need|just (checking|browsing|looking)|by mistake|wrong (number|form)|no thanks|nahi chahiye|zarurat nahi)\b/i;
 
@@ -72,12 +86,20 @@ function createLead(input, now = Date.now(), rand) {
     phone,
     chatId: `${phone}@c.us`,
     product: clean(input.product, 120),
-    qty: input.quantity ? parseQty(String(input.quantity), { loose: true }) : null,
+    qty: null,
+    qtyHint: '',
+    occasion: clean(input.occasion, 80),
+    budget: clean(input.budget, 60),
     when: clean(input.when, 80),
     note: clean(input.message, 500),
     source: clean(input.source, 60) || 'website',
     page: clean(input.page, 200),
   };
+  const qtyText = input.quantity == null ? '' : String(input.quantity);
+  if (qtyText) {
+    if (RANGE.test(qtyText)) lead.qtyHint = clean(qtyText, 40);
+    else lead.qty = parseQty(qtyText, { loose: true });
+  }
   lead.step = nextStep(lead);
   return lead;
 }
@@ -125,13 +147,22 @@ function grade(lead) {
   if (lead.qty >= 50) return 'hot';
   if (lead.qty >= 10) return 'warm';
   if (lead.qty >= 2) return 'low';
-  return 'warm'; // quantity unknown: leave it to a person
+  // exact quantity unknown: a form range of 50+ still counts as hot, otherwise a person decides
+  if (lead.qtyHint && hintMin(lead.qtyHint) >= 50) return 'hot';
+  return 'warm';
 }
 
 function summary(lead) {
   const item = lead.product || 'item not given';
-  const qty = lead.qty ? `${lead.qty} units` : lead.qtyNote ? `quantity "${lead.qtyNote}"` : 'quantity not given';
-  return `${item}, ${qty}, needed ${lead.when || 'date not given'}`;
+  const qty = lead.qty
+    ? `${lead.qty} units`
+    : lead.qtyNote
+      ? `quantity "${lead.qtyNote}"`
+      : lead.qtyHint
+        ? `about ${lead.qtyHint}`
+        : 'quantity not given';
+  const extra = `${lead.occasion ? `, for ${lead.occasion}` : ''}${lead.budget ? `, budget ${lead.budget}` : ''}`;
+  return `${item}, ${qty}, needed ${lead.when || 'date not given'}${extra}`;
 }
 
-module.exports = { makeRef, normalizePhone, findRef, parseQty, createLead, applyAnswer, nextStep, grade, summary };
+module.exports = { hintMin, makeRef, normalizePhone, findRef, parseQty, createLead, applyAnswer, nextStep, grade, summary };

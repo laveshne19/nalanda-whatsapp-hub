@@ -53,7 +53,7 @@ const T = {
 
   // ---- website enquiries ----
   leadHello: (lead, question) =>
-    `Hi ${firstName(lead)}, this is Nalanda Enterprises. Thanks for your enquiry${lead.product ? ` about ${lead.product}` : ''}. ` +
+    `Hi ${firstName(lead)}, this is Nalanda Enterprises. Thanks for your enquiry${lead.product ? ` about ${lead.product}` : lead.occasion ? ` for ${lead.occasion}` : ''}. ` +
     `To get you the right quote quickly: ${question} (Reply STOP to opt out.)`,
   leadAsk: (step, lead) => {
     if (step === 'item') return 'which item are you looking for, and roughly how many units?';

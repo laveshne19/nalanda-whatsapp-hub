@@ -93,9 +93,13 @@ async function handleEvent(payload, deps) {
     const lead = state.getLead(ref);
     if (lead) return handleLeadArrival({ deps, lead, chatId, now });
   }
+  if (!ref && /\b(enquir|inquir|quote|quotation|requested)/i.test(body)) {
+    const lead = state.unstartedLeadFor(phoneKey(phone), now);
+    if (lead) return handleLeadArrival({ deps, lead, chatId, now });
+  }
   if (!['tracking', 'cancel', 'human'].includes(intent)) {
     const lead = state.collectingLeadFor(chatId, phoneKey(phone));
-    if (lead) return handleLeadReply({ deps, lead, chatId, body, now });
+    if (lead) return handleLeadReply({ deps, lead, chatId, body, intent, now });
   }
 
   switch (intent) {
@@ -302,7 +306,9 @@ async function handleLeadArrival({ deps, lead, chatId, now }) {
   return reply(deps, chatId, text, 'lead_question', now);
 }
 
-async function handleLeadReply({ deps, lead, chatId, body, now }) {
+async function handleLeadReply({ deps, lead, chatId, body, intent, now }) {
+  // a plain "hi" is not an answer, just ask the current question again
+  if (intent === 'menu') return reply(deps, chatId, T.leadNext(lead.step, lead), 'lead_question', now);
   const before = lead.step;
   leads.applyAnswer(lead, body, now);
   deps.state.saveLead(lead);
