@@ -87,6 +87,13 @@ const T = {
     const q = T.leadAsk(step, lead);
     return `Thanks. ${q[0].toUpperCase()}${q.slice(1)}`;
   },
+  leadFollowUp: (lead, n) => {
+    const first = firstName(lead);
+    const what = lead.product ? ` about ${lead.product}` : '';
+    if (n === 0) return `Hi ${first}, just checking in on your enquiry${what}. Could you share the quantity and where you need delivery? We will then send you the best quote.`;
+    if (n % 2 === 1) return `Hi ${first}, we would love to help with your enquiry${what}. A quick reply with the quantity and delivery city is all we need to get you a quote.`;
+    return `Hi ${first}, our team is ready with your quote${what}. Reply here whenever you are ready and we will take it forward.`;
+  },
   leadKnown: (lead) =>
     `We already have your enquiry (ref ${lead.ref}). Our team will be in touch shortly. If something has changed, just tell us here.`,
   leadDone: (lead, kind) => {

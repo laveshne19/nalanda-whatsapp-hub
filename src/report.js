@@ -1,10 +1,11 @@
 'use strict';
 const { istDate, istHour, istPretty } = require('./util');
-const { leadAlert } = require('./templates');
+const { leadAlert, T } = require('./templates');
 const { summary } = require('./leads');
-const { notifyStaff } = require('./notify');
+const { notifyStaff, sendDirect } = require('./notify');
 
 const MIN = 60 * 1000;
+const HOUR_MS = 60 * MIN;
 const RETRY_GAP_MS = 10 * MIN;
 const MAX_TRIES = 3;
 
@@ -98,4 +99,37 @@ async function sweepLeads(deps) {
   return alerted;
 }
 
-module.exports = { buildReport, leadsText, maybeSendDailyReport, sweepLeads, openCalls };
+const FU_GAP_MS = 5 * HOUR_MS;
+const FU_PER_DAY = 2;
+const FU_DAYS = 4;
+
+/**
+ * A website enquiry that stays silent gets up to 2 gentle follow-ups a day for 4 days, then we stop.
+ * Any reply from the customer ends the follow-ups (the normal flow takes over).
+ */
+async function followUpLeads(deps) {
+  const { state } = deps;
+  const now = deps.now ? deps.now() : Date.now();
+  let sent = 0;
+  for (const lead of state.allLeads()) {
+    if (lead.completed || lead.status === 'done' || !lead.stale || !lead.chatId || state.isOptedOut(lead.chatId)) continue;
+    if (lead.fuStart && (now - lead.fuStart >= FU_DAYS * 24 * HOUR_MS || lead.lastActivity !== lead.fuBase)) continue;
+    if (now - (lead.fuAt || 0) < FU_GAP_MS) continue;
+    const day = istDate(now);
+    if (lead.fuDay === day && (lead.fuToday || 0) >= FU_PER_DAY) continue;
+    if (istHour(now) < 8 || istHour(now) >= 22) continue; // a nudge, not a 3 AM ping
+    const ok = await sendDirect(deps, lead.chatId, T.leadFollowUp(lead, lead.fuCount || 0));
+    if (!ok) continue;
+    if (!lead.fuStart) { lead.fuStart = now; lead.fuBase = lead.lastActivity; }
+    lead.fuCount = (lead.fuCount || 0) + 1;
+    lead.fuAt = now;
+    lead.fuToday = lead.fuDay === day ? (lead.fuToday || 0) + 1 : 1;
+    lead.fuDay = day;
+    state.saveLead(lead);
+    state.bump('lead_followups', now);
+    sent += 1;
+  }
+  return sent;
+}
+
+module.exports = { followUpLeads, buildReport, leadsText, maybeSendDailyReport, sweepLeads, openCalls };
