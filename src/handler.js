@@ -30,6 +30,9 @@ const AUTOMATED = [
   /\b(otp|one[- ]time\s+password)\b/i,
   /\brider\s+has\s+(picked|delivered)\b/i,
   /\b(udgam|rbi)\b/i,
+  // Another business pitching its own products to us (suppliers, brands, agencies) is not a customer.
+  /\b(we are|we're|this is|i am|i'm)\b[^.\n]{0,60}\b(brand|manufacturer|supplier|agency|company|startup|exporter|vendor)\b/i,
+  /\bour\s+(\w+\s+){0,2}(range|collection|catalogue|catalog)\s+(covers|includes|has|offers|consists)\b/i,
 ];
 function looksAutomated(body) {
   const t = String(body || '');

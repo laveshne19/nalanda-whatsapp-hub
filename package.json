@@ -1,6 +1,6 @@
 {
   "name": "nalanda-whatsapp-hub",
-  "version": "0.5.0",
+  "version": "0.5.1",
   "description": "Private WhatsApp hub for Nalanda Enterprises: website auto-reply, order tracking, bulk enquiries. Sits next to OpenWA.",
   "private": true,
   "license": "UNLICENSED",

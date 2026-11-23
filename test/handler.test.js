@@ -213,3 +213,16 @@ test('"is my order confirmed" never claims confirmation when no order exists for
   assert.ok(!/confirmed/.test(sent[0].text));
   assert.match(sent[0].text, /order number/);
 });
+
+test('a supplier pitching its own products gets no reply', async () => {
+  const { deps, sent } = setup();
+  const r = await handleEvent(msg("Hi Nalanda Enterprises team, we're Travellikesme, an Indian travel-gear brand. Our corporate gifting range covers backpacks and towels."), deps);
+  assert.equal(sent.length, 0);
+  assert.notEqual(r.action, 'replied');
+});
+
+test('a real corporate gifting enquiry is still answered', async () => {
+  const { deps, sent } = setup();
+  await handleEvent(msg('I need corporate gifting for 200 employees'), deps);
+  assert.ok(sent.length > 0);
+});
