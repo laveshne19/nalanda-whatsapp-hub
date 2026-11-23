@@ -92,6 +92,8 @@ services:
       - WHOLESALE_CONTACT=+91 95699 13332
       - REPORT_HOUR_IST=20
       - REPLIES_PER_CHAT_PER_HOUR=${REPLIES_PER_CHAT_PER_HOUR:-10}
+      - STAFF_REPORT_URL=${STAFF_REPORT_URL:-}
+      - STAFF_REPORT_MAP=${STAFF_REPORT_MAP:-[]}
       - STATE_PATH=/app/data/state.json
     volumes:
       - hub-data:/app/data
