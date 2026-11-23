@@ -35,6 +35,17 @@ function createClient({ baseUrl, apiKey, sessionId, fetchImpl = fetch, timeoutMs
     return { messageId: data.messageId || null };
   }
 
+  /** Recent chats with unread counts, newest first (read only). */
+  async function listChats(limit = 150) {
+    const res = await fetchImpl(`${base}/api/sessions/${enc}/chats?limit=${Number(limit) || 150}`, {
+      headers: { 'x-api-key': apiKey },
+      signal: AbortSignal.timeout(timeoutMs),
+    });
+    if (!res.ok) throw new Error(`OpenWA chat list failed: HTTP ${res.status}`);
+    const j = await res.json();
+    return Array.isArray(j) ? j : j.data || j.chats || [];
+  }
+
   /**
    * Make sure OpenWA calls this hub: list the session's webhooks, create ours if missing.
    * Safe to run on every start. If a webhook for the url exists it is left alone.
@@ -69,7 +80,7 @@ function createClient({ baseUrl, apiKey, sessionId, fetchImpl = fetch, timeoutMs
     return { created: true };
   }
 
-  return { sendText, ensureWebhook };
+  return { sendText, listChats, ensureWebhook };
 }
 
 module.exports = { verifySignature, createClient };

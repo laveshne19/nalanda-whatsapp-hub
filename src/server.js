@@ -6,6 +6,7 @@ const { createClient, verifySignature } = require('./openwa');
 const { handleEvent, intakeLead } = require('./handler');
 const { maybeSendDailyReport, sweepLeads, followUpLeads } = require('./report');
 const { maybeSendShipments } = require('./shipments');
+const { scanBacklog } = require('./backlog');
 const { retry } = require('./util');
 
 const MAX_BODY = 256 * 1024;
@@ -132,6 +133,7 @@ if (require.main === module) {
   const tick = () => {
     maybeSendDailyReport(deps).catch((e) => log(`[report] ${e.message}`));
     sweepLeads(deps).catch((e) => log(`[sweep] ${e.message}`));
+    scanBacklog(deps).catch((e) => log(`[backlog] ${e.message}`));
     followUpLeads(deps).catch((e) => log(`[followup] ${e.message}`));
     maybeSendShipments(deps).catch((e) => log(`[shipments] ${e.message}`));
   };

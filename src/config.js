@@ -43,6 +43,13 @@ function fromEnv(env = process.env) {
     staffChat: (env.STAFF_CHAT_ID || '').trim() || null,
     wholesaleContact: (env.WHOLESALE_CONTACT || '').trim() || null,
     reportHourIst: Number(env.REPORT_HOUR_IST || 20),
+    backlog: {
+      enabled: (env.BACKLOG_SCAN || 'true').trim().toLowerCase() !== 'false',
+      everyMinutes: Number(env.BACKLOG_EVERY_MINUTES || 30),
+      maxPerRun: Number(env.BACKLOG_MAX_PER_RUN || 25),
+      maxAgeDays: Number(env.BACKLOG_MAX_AGE_DAYS || 7),
+      pauseMs: Number(env.BACKLOG_PAUSE_MS || 8000),
+    },
     shipmentsHourIst: Number(env.SHIPMENTS_HOUR_IST || 18),
     businessHours: (env.BUSINESS_HOURS || '').trim() || null,
     hubWebhookUrl: (env.HUB_WEBHOOK_URL || '').trim() || null,
