@@ -18,7 +18,7 @@ class State {
     this.file = file || null;
     this.data = {
       seen: [], optOut: {}, handoff: {}, pending: {}, replies: {}, botMsgs: [],
-      stats: {}, leads: {}, lastReportDate: null, shipNotified: [], lastShipDate: null, intake: [], leadSends: [],
+      stats: {}, leads: {}, lastReportDate: null, shipNotified: [], lastShipDate: null, staffReport: { hash: null, date: null },  intake: [], leadSends: [],
     };
     if (this.file) this._load();
   }

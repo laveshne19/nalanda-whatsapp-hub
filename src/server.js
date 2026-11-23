@@ -7,6 +7,7 @@ const { handleEvent, intakeLead } = require('./handler');
 const { maybeSendDailyReport, sweepLeads, followUpLeads } = require('./report');
 const { maybeSendShipments } = require('./shipments');
 const { scanBacklog } = require('./backlog');
+const { maybeSendStaffReports } = require('./staffreports');
 const { retry } = require('./util');
 
 const MAX_BODY = 256 * 1024;
@@ -135,6 +136,7 @@ if (require.main === module) {
     sweepLeads(deps).catch((e) => log(`[sweep] ${e.message}`));
     scanBacklog(deps).catch((e) => log(`[backlog] ${e.message}`));
     followUpLeads(deps).catch((e) => log(`[followup] ${e.message}`));
+    maybeSendStaffReports(deps).catch((e) => log(`[staffreports] ${e.message}`));
     maybeSendShipments(deps).catch((e) => log(`[shipments] ${e.message}`));
   };
   setInterval(tick, 60 * 1000).unref();

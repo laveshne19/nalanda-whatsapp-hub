@@ -35,6 +35,23 @@ function createClient({ baseUrl, apiKey, sessionId, fetchImpl = fetch, timeoutMs
     return { messageId: data.messageId || null };
   }
 
+  /** Send a picture (base64 PNG) with an optional caption. */
+  async function sendImage(chatId, base64, caption, filename = 'sheet.png') {
+    const res = await fetchImpl(`${base}/api/sessions/${enc}/messages/send-image`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-api-key': apiKey },
+      body: JSON.stringify({ chatId, base64, mimetype: 'image/png', filename, caption: caption ? String(caption).slice(0, 1000) : undefined }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!res.ok) {
+      const err = new Error(`OpenWA image send failed: HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    const data = await res.json().catch(() => ({}));
+    return { messageId: data.messageId || null };
+  }
+
   /** Recent chats with unread counts, newest first (read only). */
   async function listChats(limit = 150) {
     const res = await fetchImpl(`${base}/api/sessions/${enc}/chats?limit=${Number(limit) || 150}`, {
@@ -80,7 +97,7 @@ function createClient({ baseUrl, apiKey, sessionId, fetchImpl = fetch, timeoutMs
     return { created: true };
   }
 
-  return { sendText, listChats, ensureWebhook };
+  return { sendText, sendImage, listChats, ensureWebhook };
 }
 
 module.exports = { verifySignature, createClient };

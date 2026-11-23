@@ -50,6 +50,19 @@ function fromEnv(env = process.env) {
       maxAgeDays: Number(env.BACKLOG_MAX_AGE_DAYS || 7),
       pauseMs: Number(env.BACKLOG_PAUSE_MS || 8000),
     },
+    staffReports: {
+      url: (env.STAFF_REPORT_URL || '').trim() || null,
+      hour: Number(env.STAFF_REPORT_HOUR_IST || 11),
+      lastHour: Number(env.STAFF_REPORT_LAST_HOUR_IST || 19),
+      map: (() => {
+        try {
+          const m = JSON.parse(env.STAFF_REPORT_MAP || '[]');
+          return Array.isArray(m) ? m.filter((x) => x && x.sheet && x.chat) : [];
+        } catch {
+          return [];
+        }
+      })(),
+    },
     shipmentsHourIst: Number(env.SHIPMENTS_HOUR_IST || 18),
     businessHours: (env.BUSINESS_HOURS || '').trim() || null,
     hubWebhookUrl: (env.HUB_WEBHOOK_URL || '').trim() || null,
