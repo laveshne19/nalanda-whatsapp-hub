@@ -37,7 +37,7 @@ function cleanText(t) {
 async function maybeSendStaffUpdates(deps) {
   const { state, config } = deps;
   const cfg = config.staffUpdates;
-  if (!cfg || !cfg.url) return 0;
+  if (!cfg || (!cfg.url && !cfg.secret)) return 0;
   const now = deps.now ? deps.now() : Date.now();
   const today = istDate(now);
   const su = state.data.staffUpdate || (state.data.staffUpdate = { hash: null, date: null });
@@ -47,10 +47,24 @@ async function maybeSendStaffUpdates(deps) {
   const log = deps.log || (() => {});
 
   let got;
-  try {
-    got = await fetchUpdates(cfg.url, deps.fetchImpl || fetch);
-  } catch (e) {
-    log(`[staffupdates] ${e.message}`);
+  if (su.pending) {
+    got = { json: su.pending, raw: JSON.stringify(su.pending) };
+  } else if (cfg.url) {
+    try {
+      got = await fetchUpdates(cfg.url, deps.fetchImpl || fetch);
+    } catch (e) {
+      log(`[staffupdates] ${e.message}`);
+      return 0;
+    }
+  } else {
+    got = null;
+  }
+  if (!got) {
+    if (istHour(now) >= cfg.lastHour) {
+      su.date = today;
+      state._save();
+      await notifyStaff(deps, 'The daily targets were not received today, so no target messages went to the team.');
+    }
     return 0;
   }
   const hash = crypto.createHash('sha256').update(got.raw).digest('hex');
@@ -83,6 +97,7 @@ async function maybeSendStaffUpdates(deps) {
     }
     await sleep(PAUSE_MS);
   }
+  su.pending = null;
   su.hash = hash;
   su.asOf = got.json.asOf || null;
   su.date = today;

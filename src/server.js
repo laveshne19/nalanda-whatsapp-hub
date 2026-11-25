@@ -72,6 +72,30 @@ function createServer({ config, state, openwa, fetchImpl, log = console.log }) {
       }
     }
 
+    // Daily target numbers from the office job (server to server, signed). Off unless STAFF_UPDATE_SECRET is set.
+    if (req.method === 'POST' && req.url === '/report/staff-updates') {
+      if (!config.staffUpdates || !config.staffUpdates.secret) return send(404, 'not found');
+      let raw;
+      try {
+        raw = await readBody(req, 200 * 1024);
+      } catch (e) {
+        return send(e.status || 400, 'bad request');
+      }
+      if (!verifySignature(raw, req.headers['x-update-signature'], config.staffUpdates.secret)) return send(401, 'unauthorized');
+      let j;
+      try {
+        j = JSON.parse(raw.toString('utf8'));
+      } catch {
+        return send(400, 'bad json');
+      }
+      const okMsg = (m) => m && typeof m.chat === 'string' && /@(c|g)\.us$/.test(m.chat) && typeof m.text === 'string' && m.text.length > 0;
+      if (!j || !/^\d{4}-\d{2}-\d{2}$/.test(String(j.asOf || '')) || !Array.isArray(j.messages) || !j.messages.length || j.messages.length > 20 || !j.messages.every(okMsg)) return send(400, 'bad update');
+      const su = state.data.staffUpdate || (state.data.staffUpdate = { hash: null, asOf: null, date: null });
+      su.pending = { asOf: j.asOf, messages: j.messages.map((m) => ({ key: String(m.key || '').slice(0, 40), chat: m.chat, session: m.session === 'pay' ? 'pay' : 'hub', text: m.text })) };
+      state._save();
+      return send(200, 'ok');
+    }
+
     if (req.method !== 'POST' || req.url !== '/webhook/openwa') return send(404, 'not found');
 
     let raw;

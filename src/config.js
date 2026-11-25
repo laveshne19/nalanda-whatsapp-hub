@@ -66,6 +66,7 @@ function fromEnv(env = process.env) {
     // Daily target messages: a JSON file the office job publishes (Google Drive link).
     staffUpdates: {
       url: (env.STAFF_UPDATE_URL || '').trim() || null,
+      secret: (env.STAFF_UPDATE_SECRET || '').trim() || null,
       hour: Number(env.STAFF_UPDATE_HOUR_IST || 11),
       lastHour: Number(env.STAFF_UPDATE_LAST_HOUR_IST || 19),
     },

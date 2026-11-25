@@ -95,6 +95,7 @@ services:
       - STAFF_REPORT_URL=${STAFF_REPORT_URL:-}
       - STAFF_REPORT_MAP=${STAFF_REPORT_MAP:-[]}
       - STAFF_UPDATE_URL=${STAFF_UPDATE_URL:-}
+      - STAFF_UPDATE_SECRET=${STAFF_UPDATE_SECRET:-}
       - PAYMENTS_OPENWA_KEY=${PAYMENTS_OPENWA_KEY:-}
       - PAYMENTS_SESSION_ID=${PAYMENTS_SESSION_ID:-}
       - PAYMENTS_GROUP_ID=${PAYMENTS_GROUP_ID:-}
@@ -122,7 +123,7 @@ services:
       - sh
       - -c
       - |
-        printf '%s\n' 'srv1693296.hstgr.cloud, 147-93-96-18.sslip.io {' '  handle /lead/website {' '    reverse_proxy nalanda-hub:8080' '  }' '  handle {' '    reverse_proxy openwa-api:2785' '  }' '}' > /etc/caddy/Caddyfile
+        printf '%s\n' 'srv1693296.hstgr.cloud, 147-93-96-18.sslip.io {' '  handle /lead/website {' '    reverse_proxy nalanda-hub:8080' '  }' '  handle /report/staff-updates {' '    reverse_proxy nalanda-hub:8080' '  }' '  handle {' '    reverse_proxy openwa-api:2785' '  }' '}' > /etc/caddy/Caddyfile
         exec caddy run --config /etc/caddy/Caddyfile --adapter caddyfile
     volumes:
       - caddy-data:/data

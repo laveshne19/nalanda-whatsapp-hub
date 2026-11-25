@@ -173,3 +173,21 @@ test('retry succeeds first time without waiting', async () => {
   assert.equal(await retry(async () => 7, { tries: 3, sleep: async () => { slept++; } }), 7);
   assert.equal(slept, 0);
 });
+
+test('signed daily target numbers are stored; unsigned or malformed ones are refused', async () => {
+  const state = new State(null);
+  const config = { webhookSecret: SECRET, shopify: null, staffChat: null, staffReplyPauses: false, limits: {}, staffUpdates: { secret: 'update-secret-for-tests-1', url: null } };
+  const server = createServer({ config, state, openwa: {}, log: () => {} });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${server.address().port}/report/staff-updates`;
+  const body = JSON.stringify({ asOf: '2026-11-24', messages: [{ key: 'Navneet', chat: '918437842722@c.us', session: 'hub', text: 'Hi Navneet' }] });
+  const sig = (b, s = 'update-secret-for-tests-1') => 'sha256=' + crypto.createHmac('sha256', s).update(b).digest('hex');
+  try {
+    assert.equal((await fetch(url, { method: 'POST', body })).status, 401);
+    assert.equal((await fetch(url, { method: 'POST', body, headers: { 'x-update-signature': sig(body, 'wrong-secret-wrong-secret') } })).status, 401);
+    const bad = JSON.stringify({ asOf: 'yesterday', messages: [] });
+    assert.equal((await fetch(url, { method: 'POST', body: bad, headers: { 'x-update-signature': sig(bad) } })).status, 400);
+    assert.equal((await fetch(url, { method: 'POST', body, headers: { 'x-update-signature': sig(body) } })).status, 200);
+    assert.equal(state.data.staffUpdate.pending.messages[0].chat, '918437842722@c.us');
+  } finally { server.close(); }
+});

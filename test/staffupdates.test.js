@@ -59,3 +59,12 @@ test('a missing second number is reported, not crashed on', async () => {
   assert.equal(await maybeSendStaffUpdates(deps), 1);
   assert.match(sent[sent.length - 1].text, /not connected to the hub/);
 });
+
+test('numbers pushed by the office job are sent without any link', async () => {
+  const { deps, sent } = setup();
+  deps.config.staffUpdates = { url: null, secret: 'x'.repeat(20), hour: 11, lastHour: 19 };
+  deps.state.data.staffUpdate = { hash: null, asOf: null, date: null, pending: file };
+  assert.equal(await maybeSendStaffUpdates(deps), 2);
+  assert.equal(deps.state.data.staffUpdate.pending, null);
+  assert.equal(await maybeSendStaffUpdates(deps), 0);
+});
