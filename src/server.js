@@ -88,7 +88,7 @@ function createServer({ config, state, openwa, fetchImpl, log = console.log }) {
       } catch {
         return send(400, 'bad json');
       }
-      const okMsg = (m) => m && typeof m.chat === 'string' && /@(c|g)\.us$/.test(m.chat) && typeof m.text === 'string' && m.text.length > 0;
+      const okMsg = (m) => m && typeof m.chat === 'string' && /@(c|g)\.us$/.test(m.chat) && typeof m.text === 'string' && m.text.length > 0 && config.staffUpdates.allow && config.staffUpdates.allow.includes(m.chat);
       if (!j || !/^\d{4}-\d{2}-\d{2}$/.test(String(j.asOf || '')) || !Array.isArray(j.messages) || !j.messages.length || j.messages.length > 20 || !j.messages.every(okMsg)) return send(400, 'bad update');
       const su = state.data.staffUpdate || (state.data.staffUpdate = { hash: null, asOf: null, date: null });
       su.pending = { asOf: j.asOf, messages: j.messages.map((m) => ({ key: String(m.key || '').slice(0, 40), chat: m.chat, session: m.session === 'pay' ? 'pay' : 'hub', text: m.text })) };

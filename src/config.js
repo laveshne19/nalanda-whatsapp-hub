@@ -67,6 +67,8 @@ function fromEnv(env = process.env) {
     staffUpdates: {
       url: (env.STAFF_UPDATE_URL || '').trim() || null,
       secret: (env.STAFF_UPDATE_SECRET || '').trim() || null,
+      // only these chats can ever be messaged by the daily push (comma separated). Empty means nobody.
+      allow: (env.STAFF_UPDATE_ALLOW || '').split(',').map((x) => x.trim()).filter(Boolean),
       hour: Number(env.STAFF_UPDATE_HOUR_IST || 11),
       lastHour: Number(env.STAFF_UPDATE_LAST_HOUR_IST || 19),
     },

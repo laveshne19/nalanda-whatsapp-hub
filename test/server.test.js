@@ -176,7 +176,7 @@ test('retry succeeds first time without waiting', async () => {
 
 test('signed daily target numbers are stored; unsigned or malformed ones are refused', async () => {
   const state = new State(null);
-  const config = { webhookSecret: SECRET, shopify: null, staffChat: null, staffReplyPauses: false, limits: {}, staffUpdates: { secret: 'update-secret-for-tests-1', url: null } };
+  const config = { webhookSecret: SECRET, shopify: null, staffChat: null, staffReplyPauses: false, limits: {}, staffUpdates: { secret: 'update-secret-for-tests-1', url: null, allow: ['918437842722@c.us'] } };
   const server = createServer({ config, state, openwa: {}, log: () => {} });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const url = `http://127.0.0.1:${server.address().port}/report/staff-updates`;
@@ -189,5 +189,7 @@ test('signed daily target numbers are stored; unsigned or malformed ones are ref
     assert.equal((await fetch(url, { method: 'POST', body: bad, headers: { 'x-update-signature': sig(bad) } })).status, 400);
     assert.equal((await fetch(url, { method: 'POST', body, headers: { 'x-update-signature': sig(body) } })).status, 200);
     assert.equal(state.data.staffUpdate.pending.messages[0].chat, '918437842722@c.us');
+    const other = JSON.stringify({ asOf: '2026-11-25', messages: [{ key: 'X', chat: '911234567890@c.us', text: 'hi' }] });
+    assert.equal((await fetch(url, { method: 'POST', body: other, headers: { 'x-update-signature': sig(other) } })).status, 400);
   } finally { server.close(); }
 });
