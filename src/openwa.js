@@ -63,6 +63,36 @@ function createClient({ baseUrl, apiKey, sessionId, fetchImpl = fetch, timeoutMs
     return Array.isArray(j) ? j : j.data || j.chats || [];
   }
 
+  /** Recent messages of one chat, oldest first (read only). */
+  async function history(chatId, limit = 100) {
+    const res = await fetchImpl(`${base}/api/sessions/${enc}/messages/${encodeURIComponent(chatId)}/history?limit=${Number(limit) || 100}`, {
+      headers: { 'x-api-key': apiKey },
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!res.ok) {
+      const err = new Error(`OpenWA history failed: HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    const j = await res.json();
+    return Array.isArray(j) ? j : j.data || j.messages || [];
+  }
+
+  /** The stored picture of one message as a Buffer, or null when the gateway no longer has it. */
+  async function media(chatId, messageId) {
+    const res = await fetchImpl(`${base}/api/sessions/${enc}/messages/${encodeURIComponent(chatId)}/${encodeURIComponent(messageId)}/media`, {
+      headers: { 'x-api-key': apiKey },
+      signal: AbortSignal.timeout(60000),
+    });
+    if (res.status === 404) return null;
+    if (!res.ok) {
+      const err = new Error(`OpenWA media failed: HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    return Buffer.from(await res.arrayBuffer());
+  }
+
   /**
    * Make sure OpenWA calls this hub: list the session's webhooks, create ours if missing.
    * Safe to run on every start. If a webhook for the url exists it is left alone.
@@ -97,7 +127,7 @@ function createClient({ baseUrl, apiKey, sessionId, fetchImpl = fetch, timeoutMs
     return { created: true };
   }
 
-  return { sendText, sendImage, listChats, ensureWebhook };
+  return { sendText, sendImage, listChats, history, media, ensureWebhook };
 }
 
 module.exports = { verifySignature, createClient };

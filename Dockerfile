@@ -1,7 +1,7 @@
 FROM node:22-alpine
 ENV NODE_ENV=production
 WORKDIR /app
-RUN apk add --no-cache fontconfig font-dejavu
+RUN apk add --no-cache fontconfig font-dejavu tesseract-ocr tesseract-ocr-data-eng
 COPY package.json ./
 RUN npm install --omit=dev --no-audit --no-fund && npm cache clean --force
 COPY src ./src

@@ -8,6 +8,8 @@ const { maybeSendDailyReport, sweepLeads, followUpLeads } = require('./report');
 const { maybeSendShipments } = require('./shipments');
 const { scanBacklog } = require('./backlog');
 const { maybeSendStaffReports } = require('./staffreports');
+const { maybeSendStaffUpdates } = require('./staffupdates');
+const { scanPayments, maybeSendPaymentSummary } = require('./paymentlog');
 const { retry } = require('./util');
 
 const MAX_BODY = 256 * 1024;
@@ -130,7 +132,8 @@ if (require.main === module) {
   }
 
   // Once a minute: send the daily report when due, and make sure unanswered leads reach a person.
-  const deps = { config, state, openwa, log };
+  const payClient = config.payOpenwa ? createClient(config.payOpenwa) : null;
+  const deps = { config, state, openwa, payClient, log };
   const tick = () => {
     maybeSendDailyReport(deps).catch((e) => log(`[report] ${e.message}`));
     sweepLeads(deps).catch((e) => log(`[sweep] ${e.message}`));
@@ -138,6 +141,9 @@ if (require.main === module) {
     followUpLeads(deps).catch((e) => log(`[followup] ${e.message}`));
     maybeSendStaffReports(deps).catch((e) => log(`[staffreports] ${e.message}`));
     maybeSendShipments(deps).catch((e) => log(`[shipments] ${e.message}`));
+    maybeSendStaffUpdates(deps).catch((e) => log(`[staffupdates] ${e.message}`));
+    scanPayments(deps).catch((e) => log(`[paymentlog] ${e.message}`));
+    maybeSendPaymentSummary(deps).catch((e) => log(`[paymentlog] ${e.message}`));
   };
   setInterval(tick, 60 * 1000).unref();
 

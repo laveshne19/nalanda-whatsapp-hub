@@ -25,3 +25,9 @@ Broadcast messages to a list of numbers (for example 100 a day) will be a separa
 
 - Human, polite, short. No em dashes or en dashes in any customer message.
 - The bot never cancels or refunds by itself. The team does that.
+
+## Daily target messages and payment log (added 0.7.0)
+
+- Each morning the office job publishes a small JSON file (Google Drive link, setting STAFF_UPDATE_URL). The hub sends every salesperson their own sales target, achievement, collection and outstanding, once a day, only when the file is new.
+- The Ludhiana team's group is sent from the payment-reminders number (PAYMENTS_OPENWA_KEY and PAYMENTS_SESSION_ID).
+- Every 30 minutes the hub reads new payment screenshots in the payments group, reads the amount inside each picture, and keeps a log of date, party name and amount. The owner gets a summary each evening at 8 PM. Amounts it cannot read are marked, never guessed.

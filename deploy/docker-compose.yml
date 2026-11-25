@@ -75,7 +75,7 @@ services:
     tmpfs:
       - /tmp
     pids_limit: 256
-    mem_limit: 256m
+    mem_limit: 512m
     environment:
       - PORT=8080
       - TZ=Asia/Kolkata
@@ -94,6 +94,10 @@ services:
       - REPLIES_PER_CHAT_PER_HOUR=${REPLIES_PER_CHAT_PER_HOUR:-10}
       - STAFF_REPORT_URL=${STAFF_REPORT_URL:-}
       - STAFF_REPORT_MAP=${STAFF_REPORT_MAP:-[]}
+      - STAFF_UPDATE_URL=${STAFF_UPDATE_URL:-}
+      - PAYMENTS_OPENWA_KEY=${PAYMENTS_OPENWA_KEY:-}
+      - PAYMENTS_SESSION_ID=${PAYMENTS_SESSION_ID:-}
+      - PAYMENTS_GROUP_ID=${PAYMENTS_GROUP_ID:-}
       - STATE_PATH=/app/data/state.json
     volumes:
       - hub-data:/app/data

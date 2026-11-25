@@ -63,6 +63,24 @@ function fromEnv(env = process.env) {
         }
       })(),
     },
+    // Daily target messages: a JSON file the office job publishes (Google Drive link).
+    staffUpdates: {
+      url: (env.STAFF_UPDATE_URL || '').trim() || null,
+      hour: Number(env.STAFF_UPDATE_HOUR_IST || 11),
+      lastHour: Number(env.STAFF_UPDATE_LAST_HOUR_IST || 19),
+    },
+    // The payment-reminders number: sends to the Ludhiana group and reads the payments group.
+    payOpenwa:
+      (env.PAYMENTS_OPENWA_KEY || '').trim() && (env.PAYMENTS_SESSION_ID || '').trim()
+        ? { baseUrl: need('OPENWA_URL'), apiKey: env.PAYMENTS_OPENWA_KEY.trim(), sessionId: env.PAYMENTS_SESSION_ID.trim() }
+        : null,
+    payments: {
+      groupId: (env.PAYMENTS_GROUP_ID || '').trim() || null,
+      everyMinutes: Number(env.PAYMENTS_EVERY_MINUTES || 30),
+      maxPerRun: Number(env.PAYMENTS_MAX_PER_RUN || 10),
+      pauseMs: Number(env.PAYMENTS_PAUSE_MS || 7000),
+      summaryHour: Number(env.PAYMENTS_SUMMARY_HOUR_IST || 20),
+    },
     shipmentsHourIst: Number(env.SHIPMENTS_HOUR_IST || 18),
     businessHours: (env.BUSINESS_HOURS || '').trim() || null,
     hubWebhookUrl: (env.HUB_WEBHOOK_URL || '').trim() || null,
