@@ -22,7 +22,9 @@ services:
     tmpfs:
       - /tmp
     pids_limit: 2048
-    mem_limit: 2g
+    mem_limit: 4g
+    # Chromium crashes ('Page crashed') with Docker's default 64 MB shared memory
+    shm_size: '1gb'
     ports:
       - '127.0.0.1:2785:2785'
     environment:
