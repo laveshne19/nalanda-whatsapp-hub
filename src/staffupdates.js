@@ -97,6 +97,14 @@ async function maybeSendStaffUpdates(deps) {
     }
     await sleep(PAUSE_MS);
   }
+  if (sent === 0 && problems.length) {
+    // nothing went out (for example the WhatsApp number was reconnecting): keep the numbers and try again later
+    deps._suAt = now;
+    log(`[staffupdates] nothing sent, will retry: ${problems.join(', ')}`);
+    if (!su.pending) su.pending = got.json;
+    state._save();
+    return 0;
+  }
   su.pending = null;
   su.hash = hash;
   su.asOf = got.json.asOf || null;

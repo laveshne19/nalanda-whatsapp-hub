@@ -68,3 +68,18 @@ test('numbers pushed by the office job are sent without any link', async () => {
   assert.equal(deps.state.data.staffUpdate.pending, null);
   assert.equal(await maybeSendStaffUpdates(deps), 0);
 });
+
+test('if every send fails the numbers are kept and sent on the next try, not skipped for the day', async () => {
+  const { deps, sent } = setup();
+  let down = true;
+  const flaky = { sendText: async (chat, text) => { if (down) { const e = new Error('HTTP 409'); throw e; } sent.push({ chat, text }); return { messageId: 'x' }; } };
+  deps.openwa = flaky;
+  deps.payClient = flaky;
+  assert.equal(await maybeSendStaffUpdates(deps), 0);
+  assert.equal(deps.state.data.staffUpdate.date, null);
+  assert.ok(deps.state.data.staffUpdate.pending);
+  down = false;
+  deps._suAt = 0;
+  assert.equal(await maybeSendStaffUpdates(deps), 2);
+  assert.equal(deps.state.data.staffUpdate.pending, null);
+});
